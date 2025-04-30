@@ -117,7 +117,8 @@ python -m venv venv
 source venv/bin/activate
 pip install torch
 pip install -r requirements.txt
-pip install --upgrade accelerate transformers diffusers huggingface_hub #Optional, run it if you run into apt-get update && apt-get install -y libgl1
+pip install --upgrade accelerate transformers diffusers huggingface_hub 
+apt-get update && apt-get install -y libgl1
 ```
 ### 2. Upload your dataset
 - Create a new folder in the root, name it `dataset` or whatever you like.
