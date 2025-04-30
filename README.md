@@ -229,3 +229,82 @@ black .
 ## License
 
 Apache-2.0  Black Forest Labs
+
+---
+
+## Running on Rackspace PVC
+
+This section provides step-by-step instructions for running AI Toolkit on Rackspace Private Cloud (PVC) with H100 GPUs. It covers environment setup, driver installation, CUDA, PyTorch, and troubleshooting common issues such as code hanging at image generation.
+
+### 1. Provision an H100 Instance
+- Deploy an Ubuntu 24.04 (or similar) VM with an H100 GPU attached.
+
+### 2. Install NVIDIA Drivers (Required for H100)
+**H100 requires NVIDIA driver version 525.x or newer.**
+
+```bash
+sudo apt update
+sudo apt install nvidia-driver-550
+sudo reboot
+```
+
+After reboot, verify the driver and GPU are recognized:
+
+```bash
+nvidia-smi
+```
+You should see your H100 GPU listed. If you get `Command 'nvidia-smi' not found` or no GPU is shown, the driver is not installed or loaded.
+
+### 3. Install CUDA Toolkit (Optional)
+- CUDA toolkit is typically only needed for compiling custom ops. H100 requires CUDA 12.x+.
+- Your Python environment already includes CUDA runtime libraries via pip packages (e.g., `nvidia-cudnn-cu12`).
+
+### 4. Set Up Python Environment
+```bash
+python -m venv venv && source venv/bin/activate
+pip install --upgrade pip
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+pip install -r requirements.txt
+```
+
+### 5. Verify PyTorch Sees the GPU
+Run the following in Python:
+```python
+import torch
+print(torch.cuda.is_available())          # Should print: True
+print(torch.cuda.get_device_name(0))      # Should print: NVIDIA H100 ...
+```
+If these fail, double-check your driver and CUDA installation.
+
+### 6. Run Your Training Script
+Proceed as normal:
+```bash
+python run.py --config config/schnell_config.yaml
+```
+
+### 7. Troubleshooting: Code Hangs at "Generating Images"
+If your code hangs at the point of generating images or just before training:
+- **Root Cause:** The NVIDIA driver is missing or not loaded, so PyTorch cannot see the GPU.
+- **Fix:** Install the correct NVIDIA driver (see above), then reboot.
+- **Check:** `nvidia-smi` must work and show your GPU.
+
+#### Additional Checks
+- Ensure your PyTorch and CUDA versions are compatible with H100 (PyTorch 2.0+, CUDA 12.x+).
+- Avoid using custom CUDA extensions that may not support H100.
+- Set DataLoader `num_workers=0` if you suspect multiprocessing issues.
+- Compare your environment (`pip freeze`, `nvidia-smi`, `nvcc --version`) with a working setup (e.g., Runpod).
+
+### 8. Example Environment (Working)
+- **PyTorch:** 2.6.0
+- **CUDA Toolkit:** 12.0
+- **nvidia-cudnn-cu12:** 9.1.0.70
+- **Driver:** 550+
+
+### 9. Support
+If you encounter issues, collect the output of:
+- `nvidia-smi`
+- `nvcc --version`
+- `pip freeze`
+- Error logs from your training script
+
+and share with your support channel or open an issue on GitHub.
