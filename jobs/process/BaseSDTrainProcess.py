@@ -4,7 +4,7 @@ import inspect
 import json
 import random
 import shutil
-from collections import OrderedDict
+from collections import OrderedDict, deque
 import os
 import re
 import traceback
@@ -1943,10 +1943,16 @@ class BaseSDTrainProcess(BaseTrainProcess):
         # TRAIN LOOP
         ###################################################################
 
-
         start_step_num = self.step_num
         did_first_flush = False
         flush_next = False
+        # early stopping setup
+        if self.train_config.early_stopping:
+            loss_history = deque(maxlen=self.train_config.plateau_window)
+            min_delta = self.train_config.min_delta
+        else:
+            loss_history = None
+            min_delta = None
         for step in range(start_step_num, self.train_config.steps):
             if self.train_config.do_paramiter_swapping:
                 self.optimizer.optimizer.swap_paramiters()
@@ -2155,7 +2161,6 @@ class BaseSDTrainProcess(BaseTrainProcess):
                                     f'loss/{key}': value,
                                 })
 
-
                     if self.performance_log_every > 0 and self.step_num % self.performance_log_every == 0:
                         if self.progress_bar is not None:
                             self.progress_bar.pause()
@@ -2182,6 +2187,15 @@ class BaseSDTrainProcess(BaseTrainProcess):
                 self.grad_accumulation_step += 1
                 self.end_step_hook()
 
+                # early stopping check
+                if self.train_config.early_stopping:
+                    current_loss = sum(loss_dict.values())
+                    loss_history.append(current_loss)
+                    # if no sufficient improvement over window, stop
+                    if len(loss_history) == self.train_config.plateau_window and \
+                       (loss_history[0] - loss_history[-1] < min_delta):
+                        print(f"Early stopping at step {self.step_num}: loss plateaued.")
+                        break
 
         ###################################################################
         ##  END TRAIN LOOP

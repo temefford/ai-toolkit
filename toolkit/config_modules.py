@@ -462,6 +462,11 @@ class TrainConfig:
         self.force_consistent_noise = kwargs.get('force_consistent_noise', False)
         self.blended_blur_noise = kwargs.get('blended_blur_noise', False)
 
+        # early stopping settings
+        self.early_stopping: bool = kwargs.get('early_stopping', False)
+        self.plateau_window: int = kwargs.get('plateau_window', 10)
+        self.min_delta: float = kwargs.get('min_delta', 0.0)
+
 
 ModelArch = Literal['sd1', 'sd2', 'sd3', 'sdxl', 'pixart', 'pixart_sigma', 'auraflow', 'flux', 'flex2', 'lumina2', 'vega', 'ssd', 'wan21']
 
@@ -1116,17 +1121,3 @@ class GenerateImageConfig:
             return
 
         self.logger.log_image(image, count, self.prompt)
-        
-        
-def validate_configs(
-    train_config: TrainConfig,
-    model_config: ModelConfig,
-    save_config: SaveConfig,
-):
-    if model_config.is_flux:
-        if save_config.save_format != 'diffusers':
-            # make it diffusers
-            save_config.save_format = 'diffusers'
-        if model_config.use_flux_cfg:
-            # bypass the embedding
-            train_config.bypass_guidance_embedding = True
