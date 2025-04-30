@@ -14,6 +14,10 @@ from toolkit.config import get_config
 
 
 class CostBenchmarkJob(BaseJob):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.records = []
+
     """
     Run identical fine-tuning experiments across multiple cloud/hardware providers,
     track cost (USD) and performance, and aggregate results.
