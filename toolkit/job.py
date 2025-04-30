@@ -27,6 +27,9 @@ def get_job(
     if job == 'extension':
         from jobs import ExtensionJob
         return ExtensionJob(config)
+    if job == 'cost_benchmark':
+        from jobs.CostBenchmarkJob import CostBenchmarkJob
+        return CostBenchmarkJob(config)
 
     # elif job == 'train':
     #     from jobs import TrainJob

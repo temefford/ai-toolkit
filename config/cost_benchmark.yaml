@@ -1,4 +1,6 @@
-cost_benchmark:
+job: "cost_benchmark"
+config:
+  name: "cost_benchmark"
   base_config_file: "config/schnell_config.yaml"
   providers:
     - name: "runpod"

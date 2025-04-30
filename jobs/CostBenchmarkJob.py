@@ -53,13 +53,13 @@ class CostBenchmarkJob(BaseJob):
         df = pd.DataFrame(self.records)
         md_lines = []
         md_lines.append(f"# Cost Benchmark Report ({timestamp})\n")
-        md_lines.append(f"## Providers\n")
+        md_lines.append("## Providers\n")
         for prov in self.providers:
             md_lines.append(f"- **{prov['name']}**: ${prov.get('cost_per_sec', 0):.5f}/sec, throughput ratio: {prov.get('throughput_ratio', 1.0)}")
-        md_lines.append(f"\n## Datasets\n")
+        md_lines.append("\n## Datasets\n")
         for ds in self.datasets:
             md_lines.append(f"- **{ds['name']}**: metadata: {ds.get('metadata_file','')}, GT: {ds.get('gt_dir','')}, prompts: {ds.get('prompts_file','')}")
-        md_lines.append(f"\n## Results Table\n")
+        md_lines.append("\n## Results Table\n")
         md_lines.append(df.to_markdown(index=False))
 
         # Plots
@@ -129,6 +129,13 @@ class CostBenchmarkJob(BaseJob):
 
     def run(self):
         super().run()
+        # initialize config attributes
+        cfg = self.config
+        self.base_config_file = cfg.get('base_config_file')
+        self.providers = cfg.get('providers', [])
+        self.datasets = cfg.get('datasets', [])
+        self.performance_target = cfg.get('performance_target', {})
+        self.output_dir = cfg.get('output_dir', 'outputs/Cost_Benchmarks')
         # load base config
         base_full = get_config(self.base_config_file)
         base_cfg = base_full['config']
