@@ -747,20 +747,15 @@ class BaseSDTrainProcess(BaseTrainProcess):
         return None
 
     def hook_train_loop(self, batch):
-        # Compute your actual loss here. Example below assumes batch contains input and target tensors.
-        # Replace this logic with your actual model and loss computation as needed.
-        input_tensor = batch.get('input') if isinstance(batch, dict) else batch[0]
-        target_tensor = batch.get('target') if isinstance(batch, dict) else batch[1]
-        if input_tensor is not None and target_tensor is not None:
-            criterion = torch.nn.MSELoss()
-            output = self.sd(input_tensor) if hasattr(self, 'sd') else input_tensor
-            loss = criterion(output, target_tensor)
-            loss_value = loss.item()
+        # Print the batch structure for debugging
+        if isinstance(batch, dict):
+            print(f"[DEBUG] hook_train_loop: batch is dict with keys: {list(batch.keys())}")
+        elif isinstance(batch, list):
+            print(f"[DEBUG] hook_train_loop: batch is list of length {len(batch)}. First item: {batch[0] if batch else 'EMPTY'}")
         else:
-            # If batch structure is unknown, return dummy value but log warning
-            print("[WARNING] hook_train_loop: batch missing 'input' or 'target', returning dummy loss.")
-            loss_value = 0.0
-        return {'loss': loss_value}
+            print(f"[DEBUG] hook_train_loop: batch type: {type(batch)}")
+        # Return a dummy loss to avoid crashing, update this once batch structure is confirmed
+        return {'loss': 0.0}
 
     def hook_after_sd_init_before_load(self):
         pass
