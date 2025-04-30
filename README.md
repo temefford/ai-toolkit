@@ -60,7 +60,9 @@ git clone https://github.com/temefford/ai-toolkit.git
 cd ai-toolkit
 python -m venv venv && source venv/bin/activate
 pip install --upgrade pip
+pip install torch
 pip install -r requirements.txt
+pip install --upgrade accelerate transformers diffusers huggingface_hub
 # Required packages include: torch, diffusers, accelerate, transformers, torchmetrics, matplotlib, seaborn, reportlab, pillow
 ```
 
@@ -68,7 +70,7 @@ pip install -r requirements.txt
 
 On Ubuntu/Debian:
 ```bash
-apt-get update && apt-get install -y libgl1 libglib2.0-0
+sudo apt-get update && sudo apt-get install -y libgl1 libglib2.0-0
 ```
 
 ---
@@ -143,6 +145,8 @@ cost_benchmark:
 Run:
 ```bash
 python run.py config/cost_benchmark.yaml
+# or with accelerate:
+accelerate launch run.py config/cost_benchmark.yaml
 ```
 
 Generate report in Python:
