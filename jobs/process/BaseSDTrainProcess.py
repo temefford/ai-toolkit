@@ -246,7 +246,7 @@ class BaseSDTrainProcess(BaseTrainProcess):
         self.snr_gos: Union[LearnableSNRGamma, None] = None
         self.ema: ExponentialMovingAverage = None
         
-        validate_configs(self.train_config, self.model_config, self.save_config)
+
 
     def post_process_generate_image_config_list(self, generate_image_config_list: List[GenerateImageConfig]):
         # override in subclass
