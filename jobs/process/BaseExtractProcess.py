@@ -11,6 +11,8 @@ from typing import ForwardRef
 from toolkit.train_tools import get_torch_dtype
 
 
+import datetime
+
 class BaseExtractProcess(BaseProcess):
 
     def __init__(
@@ -30,6 +32,10 @@ class BaseExtractProcess(BaseProcess):
         self.dtype = self.get_conf('dtype', self.job.dtype)
         self.torch_dtype = get_torch_dtype(self.dtype)
         self.extract_unet = self.get_conf('extract_unet', self.job.extract_unet)
+        # Timestamp for this run (YYYYMMDD-HHMMSS)
+        self.run_timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        # Append timestamp to output_folder for unique folder per run
+        self.output_folder = os.path.join(self.output_folder, self.run_timestamp)
         self.extract_text_encoder = self.get_conf('extract_text_encoder', self.job.extract_text_encoder)
 
     def run(self):
@@ -75,12 +81,18 @@ class BaseExtractProcess(BaseProcess):
         # save
         os.makedirs(os.path.dirname(self.output_path), exist_ok=True)
 
+        # Add timestamp to filename for uniqueness
+        timestamp = self.run_timestamp if hasattr(self, 'run_timestamp') else datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        base, ext = os.path.splitext(self.output_path)
+        output_path = f"{base}_{timestamp}{ext}"
+
         for key in list(state_dict.keys()):
             v = state_dict[key]
             v = v.detach().clone().to("cpu").to(self.torch_dtype)
             state_dict[key] = v
 
         # having issues with meta
-        save_file(state_dict, self.output_path, save_meta)
+        save_file(state_dict, output_path, save_meta)
 
-        print(f"Saved to {self.output_path}")
+        print(f"Saved to {output_path}")
+

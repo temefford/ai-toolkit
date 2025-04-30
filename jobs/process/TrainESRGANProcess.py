@@ -38,6 +38,8 @@ IMAGE_TRANSFORMS = transforms.Compose(
 )
 
 
+import datetime
+
 class TrainESRGANProcess(BaseTrainProcess):
     def __init__(self, process_id: int, job, config: OrderedDict):
         super().__init__(process_id, job, config)
@@ -48,6 +50,10 @@ class TrainESRGANProcess(BaseTrainProcess):
         self.datasets_objects = self.get_conf('datasets', required=True)
         self.batch_size = self.get_conf('batch_size', 1, as_type=int)
         self.resolution = self.get_conf('resolution', 256, as_type=int)
+        # Timestamp for this run (YYYYMMDD-HHMMSS)
+        self.run_timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        # Append timestamp to save_root for unique folder per run
+        self.save_root = os.path.join(self.save_root, self.run_timestamp)
         self.learning_rate = self.get_conf('learning_rate', 1e-6, as_type=float)
         self.sample_every = self.get_conf('sample_every', None)
         self.optimizer_type = self.get_conf('optimizer', 'adam')

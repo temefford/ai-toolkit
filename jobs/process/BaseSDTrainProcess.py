@@ -79,9 +79,19 @@ def flush():
 
 class BaseSDTrainProcess(BaseTrainProcess):
 
-    def __init__(self, process_id: int, job, config: OrderedDict, custom_pipeline=None):
+    def __init__(
+            self,
+            process_id: int,
+            job,
+            config: OrderedDict,
+            custom_pipeline=None):
         super().__init__(process_id, job, config)
         self.accelerator: Accelerator = get_accelerator()
+        # Timestamp for this run (YYYYMMDD-HHMMSS)
+        self.run_timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        # Append timestamp to save_root for unique folder per run
+        self.save_root = os.path.join(self.save_root, self.run_timestamp)
+
         if self.accelerator.is_local_main_process:
             transformers.utils.logging.set_verbosity_warning()
             diffusers.utils.logging.set_verbosity_error()
@@ -465,10 +475,12 @@ class BaseSDTrainProcess(BaseTrainProcess):
             # zeropad 9 digits
             step_num = f"_{str(step).zfill(9)}"
 
-        self.update_training_metadata()
-        filename = f'{self.job.name}{step_num}.safetensors'
+        # Add timestamp to filename for uniqueness
+        timestamp = self.run_timestamp if hasattr(self, 'run_timestamp') else datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        filename = f'{self.job.name}_{timestamp}{step_num}.safetensors'
         file_path = os.path.join(self.save_root, filename)
 
+        self.update_training_metadata()
         save_meta = copy.deepcopy(self.meta)
         # get extra meta
         if self.adapter is not None and isinstance(self.adapter, CustomAdapter):
