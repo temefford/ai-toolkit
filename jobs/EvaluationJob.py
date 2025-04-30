@@ -7,6 +7,7 @@ import seaborn as sns
 import requests
 from PIL import Image
 import torch
+import os
 from diffusers import StableDiffusionPipeline
 
 from collections import OrderedDict
@@ -18,6 +19,7 @@ from toolkit.metrics import (
     compute_inception_score,
     compute_fid,
 )
+from torchmetrics.image.fid import FrechetInceptionDistance
 import lpips
 
 class EvaluationJob(BaseJob):
@@ -38,7 +40,19 @@ class EvaluationJob(BaseJob):
 
     def run(self):
         super().run()
-        # ----- Validation evaluation -----
+        # Load validation prompts and ground truth images
+        prompts, gt_images = [], []
+        if self.gt_dir and self.prompts_file:
+            with open(self.prompts_file) as f:
+                prompts = [l.strip() for l in f if l.strip()]
+            gt_images = [Image.open(os.path.join(self.gt_dir, f"{i}.png")) for i in range(len(prompts))]
+        # Setup FID and LPIPS metrics if data available
+        if gt_images:
+            gt_tensors = torch.stack([pil_to_tensor(img, device=self.device) for img in gt_images]).to(self.device)
+            fid_metric = FrechetInceptionDistance(feature=2048, reset_real_features=False).to(self.device)
+            fid_metric.update(gt_tensors, real=True)
+            lpips_metric = lpips.LPIPS(net='vgg').to(self.device)
+        # Evaluate each checkpoint
         for ckpt in self.ckpts:
             ckpt_name = os.path.basename(ckpt)
             print(f'Evaluating checkpoint: {ckpt_name}')
@@ -49,28 +63,28 @@ class EvaluationJob(BaseJob):
             ).to(self.device)
             load_time = time.time() - t0
 
-            mse, clip, fid, lpips_score = None, None, None, None
-            if self.gt_dir and self.prompts_file:
-                with open(self.prompts_file) as f:
-                    prompts = [l.strip() for l in f if l.strip()]
-                gt_images = [Image.open(os.path.join(self.gt_dir, f'{i}.png')) for i in range(len(prompts))]
+            mse = clip = fid_val = lpips_score = None
+            if gt_images:
                 gen_images = [pipe(p).images[0] for p in prompts]
                 mse = compute_validation_mse(gt_images, gen_images)
                 clip = compute_clip_score(prompts, gen_images, device=self.device)
-                fid = compute_fid(gt_images, gen_images, device=self.device)
-                # Compute LPIPS
-                lpips_fn = lpips.LPIPS(net='alex').to(self.device)
-                gt_tensors = [pil_to_tensor(img, device=self.device).unsqueeze(0) for img in gt_images]
-                gen_tensors = [pil_to_tensor(img, device=self.device).unsqueeze(0) for img in gen_images]
-                lpips_vals = [lpips_fn(gt, gen).item() for gt, gen in zip(gt_tensors, gen_tensors)]
-                lpips_score = sum(lpips_vals) / len(lpips_vals)
+                # FID: reset and compute
+                fid_metric.reset()
+                fake_tensors = torch.stack([pil_to_tensor(img, device=self.device) for img in gen_images]).to(self.device)
+                fid_metric.update(fake_tensors, real=False)
+                fid_val = float(fid_metric.compute())
+                # LPIPS: normalize to [-1,1]
+                gt_norm = gt_tensors * 2 - 1
+                fake_norm = fake_tensors * 2 - 1
+                lpips_val = lpips_metric(fake_norm, gt_norm)
+                lpips_score = float(lpips_val.mean())
 
             self.results.append({
                 'checkpoint': ckpt_name,
                 'evaluation_type': 'validation',
                 'mse': mse,
                 'clip': clip,
-                'fid': fid,
+                'fid': fid_val,
                 'lpips': lpips_score,
                 'time_sec': load_time,
             })
