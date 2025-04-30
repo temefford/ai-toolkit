@@ -36,18 +36,20 @@ class OptimizeJob(BaseJob):
         results = []
 
         for i in range(trials):
-            # sample hyperparameters
-            rank = random.choice(self.optimize_cfg.get('rank', [self.base_cfg['network']['linear']]))
-            lr = random.choice(self.optimize_cfg.get('lr', [self.base_cfg['train']['lr']]))
-            dropout = random.choice(self.optimize_cfg.get('dropout', [self.base_cfg['datasets'][0].get('caption_dropout_rate', 0)]))
-            batch_size = random.choice(self.optimize_cfg.get('batch_size', [self.base_cfg['train']['batch_size']]))
+            # sample hyperparameters from nested process[0]
+            base_proc = self.base_cfg['process'][0]
+            rank = random.choice(self.optimize_cfg.get('rank', [base_proc['network']['linear']]))
+            lr = random.choice(self.optimize_cfg.get('lr', [base_proc['train']['lr']]))
+            dropout = random.choice(self.optimize_cfg.get('dropout', [base_proc['datasets'][0].get('caption_dropout_rate', 0)]))
+            batch_size = random.choice(self.optimize_cfg.get('batch_size', [base_proc['train']['batch_size']]))
 
-            # prepare trial config
+            # prepare trial config (deepcopy and update process[0])
             trial_cfg = copy.deepcopy(self.base_cfg)
-            trial_cfg['network']['linear'] = rank
-            trial_cfg['train']['lr'] = lr
-            trial_cfg['train']['batch_size'] = batch_size
-            trial_cfg['datasets'][0]['caption_dropout_rate'] = dropout
+            proc = trial_cfg['process'][0]
+            proc['network']['linear'] = rank
+            proc['train']['lr'] = lr
+            proc['train']['batch_size'] = batch_size
+            proc['datasets'][0]['caption_dropout_rate'] = dropout
 
             full_conf = {'job': 'extension', 'config': trial_cfg}
 
