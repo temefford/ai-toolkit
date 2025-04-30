@@ -14,8 +14,18 @@ from toolkit.config import get_config
 
 
 class CostBenchmarkJob(BaseJob):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, config: OrderedDict):
+        super().__init__(config)
+        # Hardware identifier for this benchmark run
+        self.hardware = self.get_conf('hardware', required=True)
+        # Base training config file path
+        self.base_config_file = self.get_conf('base_config_file', required=True)
+        # Providers and datasets to benchmark
+        self.providers = self.get_conf('providers', [])
+        self.datasets = self.get_conf('datasets', [])
+        # Output directory for results
+        self.output_dir = self.get_conf('output_dir', 'outputs/Cost_Benchmarks')
+        # Records of each benchmark run
         self.records = []
 
     """
@@ -132,96 +142,90 @@ class CostBenchmarkJob(BaseJob):
             print(f"Could not generate PDF: {e}\nInstall reportlab and pillow for PDF export.")
 
     def run(self):
+        import time, datetime, os, copy
+        import pandas as pd
+        import torch
+        import lpips
+        from collections import OrderedDict
+        from toolkit.config import get_config
+        from jobs.TrainJob import TrainJob
+        from jobs.EvaluationJob import EvaluationJob
+
         super().run()
-        # initialize config attributes
-        cfg = self.config
-        self.base_config_file = cfg.get('base_config_file')
-        self.providers = cfg.get('providers', [])
-        self.datasets = cfg.get('datasets', [])
-        self.performance_target = cfg.get('performance_target', {})
-        self.output_dir = cfg.get('output_dir', 'outputs/Cost_Benchmarks')
-        # load base config
+        # Load base config
         base_full = get_config(self.base_config_file)
         base_cfg = base_full['config']
+        timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 
-        metric_key = list(self.performance_target.keys())[0] if self.performance_target else None
+        # Benchmark each provider and dataset
         for prov in self.providers:
-            pname = prov['name']
-            cost_rate = prov.get('cost_per_sec', 0.0)
-            throughput = prov.get('throughput_ratio', 1.0)
+            pname = prov.get('name')
+            cost_rate = float(prov.get('cost_per_sec', 0.0))
+            throughput = float(prov.get('throughput_ratio', 1.0))
             for ds in self.datasets:
-                ds_name = ds['name']
-                meta_file = ds.get('metadata_file')
-                gt_dir = ds.get('gt_dir')
-                prompts_file = ds.get('prompts_file')
-
-                # prepare training config
-                cfg = copy.deepcopy(base_cfg)
-                if 'datasets' in cfg and cfg['datasets']:
-                    cfg['datasets'][0]['metadata_file'] = meta_file
-                # set output folder for this run
-                exp_dir = os.path.join(self.output_dir, f"{pname}_{ds_name}")
-                cfg['training_folder'] = exp_dir
-
-                # TODO: early stopping when performance_target is reached
-                start = time.time()
-                job = TrainJob({'job': 'train', 'config': cfg, 'meta': OrderedDict({'provider': pname, 'dataset': ds_name})})
-                job.run()
-                job.cleanup()
-                elapsed = time.time() - start
-
-                # compute cost USD
-                cost_usd = (elapsed / throughput) * cost_rate
-
-                # run evaluation on validation set
+                ds_name = ds.get('name')
+                # Prepare training config copy
+                cfg_copy = copy.deepcopy(base_cfg)
+                if 'datasets' in cfg_copy and cfg_copy['datasets']:
+                    cfg_copy['datasets'][0]['metadata_file'] = ds.get('metadata_file')
+                exp_dir = os.path.join(self.output_dir, f"{self.hardware}_{pname}_{ds_name}_{timestamp}")
+                cfg_copy['training_folder'] = exp_dir
                 os.makedirs(exp_dir, exist_ok=True)
+
+                # 1. Run training
+                start_time = time.time()
+                train_conf = {
+                    'job': 'train',
+                    'config': cfg_copy,
+                    'meta': OrderedDict({'hardware': self.hardware, 'provider': pname, 'dataset': ds_name})
+                }
+                train_job = TrainJob(train_conf)
+                train_job.run()
+                train_job.cleanup()
+                duration = time.time() - start_time
+                cost_usd = (duration / throughput) * cost_rate
+
+                # 2. Run validation evaluation
+                ckpts = [os.path.join(exp_dir, f) for f in os.listdir(exp_dir) if f.endswith('.safetensors')]
+                val_cfg = {'gt_dir': ds.get('gt_dir'), 'prompts_file': ds.get('prompts_file')}
                 eval_conf = {
                     'job': 'evaluation',
                     'config': {
-                        'name': f"{pname}_{ds_name}_eval",
-                        'evaluation': {
-                            'ckpts': [os.path.join(exp_dir, f) for f in os.listdir(exp_dir) if f.endswith('.safetensors')],
-                            'validation': {'gt_dir': gt_dir, 'prompts_file': prompts_file},
-                            'art_styles': []
-                        }
+                        'name': f"benchmark_eval_{self.hardware}_{pname}_{ds_name}_{timestamp}",
+                        'evaluation': {'ckpts': ckpts, 'validation': val_cfg, 'art_styles': []}
                     }
                 }
                 eval_job = EvaluationJob(eval_conf)
                 eval_job.run()
-                eval_job.cleanup()
 
-                # extract performance metric
-                perf_value = None
-                for e in eval_job.results:
-                    if e['evaluation_type'] == 'validation':
-                        perf_value = e.get(metric_key)
+                # Extract metrics
+                mse = fid = lpips_score = clip = None
+                for res in getattr(eval_job, 'results', []):
+                    if res.get('evaluation_type') == 'validation':
+                        mse = res.get('mse')
+                        clip = res.get('clip')
+                        fid = res.get('fid')
+                        lpips_score = res.get('lpips')
                         break
 
+                # Record
                 self.records.append({
+                    'hardware': self.hardware,
                     'provider': pname,
                     'dataset': ds_name,
-                    'elapsed_sec': elapsed,
+                    'timestamp': timestamp,
+                    'train_time_sec': duration,
                     'cost_usd': cost_usd,
-                    metric_key: perf_value
+                    'validation_loss': mse,
+                    'FID': fid,
+                    'LPIPS': lpips_score,
+                    'CLIP': clip,
                 })
 
-        # aggregate results
+        # 3. Print and save results
         df = pd.DataFrame(self.records)
-        csv_path = os.path.join(self.output_dir, f"{self.name}_cost_analysis.csv")
+        print("\n===== Cost/Performance Analysis =====")
+        print(df.to_string(index=False))
+        csv_path = os.path.join(self.output_dir, f"benchmark_results_{self.hardware}_{timestamp}.csv")
         df.to_csv(csv_path, index=False)
-        print(f"Saved cost analysis CSV: {csv_path}")
-
-        sns.set(style='whitegrid')
-        # cost per dataset per provider
-        plt.figure(figsize=(8, 6))
-        sns.barplot(data=df, x='dataset', y='cost_usd', hue='provider')
-        plt.title('Cost per Dataset by Provider')
-        plt.savefig(os.path.join(self.output_dir, f"{self.name}_cost_comparison.png"))
-
-        # cost vs performance
-        if metric_key:
-            plt.figure(figsize=(8, 6))
-            sns.scatterplot(data=df, x='cost_usd', y=metric_key, hue='provider', style='dataset', s=100)
-            plt.title(f"Cost vs {metric_key}" )
-            plt.savefig(os.path.join(self.output_dir, f"{self.name}_cost_vs_{metric_key}.png"))
-            print(f"Saved cost vs performance plot.")
+        print(f"Saved benchmark results to {csv_path}")

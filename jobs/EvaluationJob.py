@@ -12,11 +12,13 @@ from diffusers import StableDiffusionPipeline
 from collections import OrderedDict
 from jobs import BaseJob
 from toolkit.metrics import (
+    pil_to_tensor,
     compute_validation_mse,
     compute_clip_score,
     compute_inception_score,
     compute_fid,
 )
+import lpips
 
 class EvaluationJob(BaseJob):
     """
@@ -47,7 +49,7 @@ class EvaluationJob(BaseJob):
             ).to(self.device)
             load_time = time.time() - t0
 
-            mse, clip = None, None
+            mse, clip, fid, lpips_score = None, None, None, None
             if self.gt_dir and self.prompts_file:
                 with open(self.prompts_file) as f:
                     prompts = [l.strip() for l in f if l.strip()]
@@ -55,12 +57,21 @@ class EvaluationJob(BaseJob):
                 gen_images = [pipe(p).images[0] for p in prompts]
                 mse = compute_validation_mse(gt_images, gen_images)
                 clip = compute_clip_score(prompts, gen_images, device=self.device)
+                fid = compute_fid(gt_images, gen_images, device=self.device)
+                # Compute LPIPS
+                lpips_fn = lpips.LPIPS(net='alex').to(self.device)
+                gt_tensors = [pil_to_tensor(img, device=self.device).unsqueeze(0) for img in gt_images]
+                gen_tensors = [pil_to_tensor(img, device=self.device).unsqueeze(0) for img in gen_images]
+                lpips_vals = [lpips_fn(gt, gen).item() for gt, gen in zip(gt_tensors, gen_tensors)]
+                lpips_score = sum(lpips_vals) / len(lpips_vals)
 
             self.results.append({
                 'checkpoint': ckpt_name,
                 'evaluation_type': 'validation',
                 'mse': mse,
                 'clip': clip,
+                'fid': fid,
+                'lpips': lpips_score,
                 'time_sec': load_time,
             })
 

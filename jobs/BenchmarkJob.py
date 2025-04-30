@@ -32,6 +32,7 @@ class BenchmarkJob(BaseJob):
         self.output_dir = bench_cfg.get('output_dir', 'benchmarks')
         os.makedirs(self.output_dir, exist_ok=True)
         self.records = []
+        self.hardware = self.get_conf('hardware', required=True)
 
     def run(self):
         super().run()
@@ -47,15 +48,6 @@ class BenchmarkJob(BaseJob):
 
             # Prepare training config
             cfg = copy.deepcopy(base_cfg)
-            # Inject hyperparameters
-            if 'rank' in self.best_params:
-                cfg['network']['linear'] = self.best_params['rank']
-            if 'lr' in self.best_params:
-                cfg['train']['lr'] = self.best_params['lr']
-            if 'batch_size' in self.best_params:
-                cfg['train']['batch_size'] = self.best_params['batch_size']
-            if 'dropout' in self.best_params and 'datasets' in cfg:
-                cfg['datasets'][0]['caption_dropout_rate'] = self.best_params['dropout']
             # Override dataset metadata file
             if 'datasets' in cfg and cfg['datasets']:
                 cfg['datasets'][0]['metadata_file'] = meta_file
