@@ -37,7 +37,9 @@ python-slugify
 opencv-python
 pytorch-wavelets==1.3.0
 matplotlib==3.10.1
+seaborn
 markdown2
 reportlab
 pillow
 packaging
+torchmetrics
