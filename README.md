@@ -1,138 +1,227 @@
-# AI Toolkit by Ostris
+# AI Toolkit: Diffusion Model Training and Analysis
 
-AI Toolkit is an all in one training suite for diffusion models. I try to support all the latest models on consumer grade hardware. Image and video models. It can be run as a GUI or CLI. It is designed to be easy to use but still have every feature imaginable.
+## Overview
+
+AI Toolkit is a modular, production-grade framework for training and evaluating diffusion-based neural models (e.g., Stable Diffusion, FLUX). It provides:
+
+- A reusable Python library (`toolkit/`) with abstractions for configuration, data loading, model patching (LoRA), training loops, and metrics computation.
+- An agent-style job system (`jobs/`) supporting fine-tuning, hyperparameter optimization, cost benchmarking, and custom evaluations.
+- CLI entrypoints (`run.py`, `optimize_run.py`) for batch execution via YAML/JSON configs.
+- Jupyter notebooks (`notebooks/`) showcasing end-to-end workflows: fine-tuning, hyperopt, style analysis, and reporting.
+- Automated reporting: generates Markdown and PDF summaries with plots and tables.
+- Comprehensive tests (`tests/`) and CI workflows for linting, testing, and documentation.
+
+---
+
+## Repo Structure
+
+```
+ai-toolkit/
+├── toolkit/                # Core library modules
+│   ├── config.py           # Config loader and parser
+│   ├── data_loader.py      # Dataset and DataLoader abstractions
+│   ├── patch_lora.py       # LoRA adapter injection into UNet
+│   ├── metrics.py          # Loss and evaluation metrics (MSE, CLIP, FID, IS)
+│   ├── image_utils.py      # Utilities for image handling
+│   ├── optimizer.py        # Optimizer factory (AdamW8bit, etc.)
+│   ├── paths.py            # Standardized project paths
+│   └── training/           # Subpackage for training routines
+│       └── train.py        # Training loop (EMA, checkpointing, sampling)
+├── jobs/                   # Job definitions using BaseJob abstraction
+│   ├── BaseJob.py          # Core job orchestration
+│   ├── BaseSDTrainProcess.py  # Base for SD training processes
+│   ├── TrainJob.py         # Single-run fine-tuning job
+│   ├── OptimizeJob.py      # Randomized hyperparameter search
+│   ├── CostBenchmarkJob.py # Cost and performance benchmarking across providers
+│   ├── BenchmarkJob.py     # Generic benchmark runner
+│   └── ExtensionJob.py     # Adapter for custom job types
+├── config/                 # Configuration files
+│   ├── schnell_config.yaml     # Base training configuration
+│   ├── optimize_params.yaml    # Hyperopt search spaces and trials
+│   └── examples/            # Example YAML/JSON configs
+├── notebooks/              # Demonstration notebooks
+│   ├── Hyperopt_Demo.ipynb
+│   ├── Art_Style_Evaluation.ipynb
+│   └── HF_Upload_Inference_Demo.ipynb
+├── tests/                  # Unit tests for toolkit and jobs
+│   └── test_*.py
+├── run.py                  # CLI for fine-tuning (alias for TrainJob)
+├── optimize_run.py         # CLI for hyperparameter optimization
+├── experiments/            # Output CSV/JSON/plots from runs
+└── README.md               # This detailed overview
+```
+
+---
 
 ## Installation
 
-Requirements:
-- python >3.10
-- Nvidia GPU with enough ram to do what you need
-- python venv
-- git
-
-
-Linux:
 ```bash
-git clone https://github.com/ostris/ai-toolkit.git
+git clone https://github.com/temefford/ai-toolkit.git
 cd ai-toolkit
-python3 -m venv venv
-source venv/bin/activate
-# install torch first
-pip3 install --no-cache-dir torch==2.6.0 torchvision==0.21.0 --index-url https://download.pytorch.org/whl/cu126
-pip3 install -r requirements.txt
+python -m venv venv && source venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
+# Required packages include: torch, diffusers, accelerate, transformers, torchmetrics, matplotlib, seaborn, reportlab, pillow
 ```
 
-Windows:
+### System Libraries
+
+On Ubuntu/Debian:
 ```bash
-git clone https://github.com/ostris/ai-toolkit.git
-cd ai-toolkit
-python -m venv venv
-.\venv\Scripts\activate
-pip install --no-cache-dir torch==2.6.0 torchvision==0.21.0 --index-url https://download.pytorch.org/whl/cu126
-pip install -r requirements.txt
+apt-get update && apt-get install -y libgl1 libglib2.0-0
 ```
 
+---
 
-## FLUX.1 Training
+## Configuration
 
-### Requirements
-You currently need a GPU with **at least 24GB of VRAM** to train FLUX.1. If you are using it as your GPU to control 
-your monitors, you probably need to set the flag `low_vram: true` in the config file under `model:`. This will quantize
-the model on CPU and should allow it to train with monitors attached. Users have gotten it to work on Windows with WSL,
-but there are some reports of a bug when running on windows natively. 
-I have only tested on linux for now. This is still extremely experimental
-and a lot of quantizing and tricks had to happen to get it to fit on 24GB at all. 
+### Base Training Config (`config/schnell_config.yaml`)
 
-### FLUX.1-dev
+Defines model & training parameters:
+- **process**: list of stages, e.g., `sd_trainer`, with nested keys:
+  - `training_folder`, `device`, LoRA `network` settings,
+  - `save` (checkpoint settings),
+  - `datasets` with paths, augmentations, resolution buckets,
+  - `train` hyperparameters: batch size, steps, optimizer, learning rate,
+  - optional `performance_log_every`, `trigger_word`, and more.
 
-FLUX.1-dev has a non-commercial license. Which means anything you train will inherit the
-non-commercial license. It is also a gated model, so you need to accept the license on HF before using it.
-Otherwise, this will fail. Here are the required steps to setup a license.
+### Hyperopt Config (`config/optimize_params.yaml`)
 
-1. Sign into HF and accept the model access here [black-forest-labs/FLUX.1-dev](https://huggingface.co/black-forest-labs/FLUX.1-dev)
-2. Make a file named `.env` in the root on this folder
-3. [Get a READ key from huggingface](https://huggingface.co/settings/tokens/new?) and add it to the `.env` file like so `HF_TOKEN=your_key_here`
-
-### FLUX.1-schnell
-
-FLUX.1-schnell is Apache 2.0. Anything trained on it can be licensed however you want and it does not require a HF_TOKEN to train.
-However, it does require a special adapter to train with it, [ostris/FLUX.1-schnell-training-adapter](https://huggingface.co/ostris/FLUX.1-schnell-training-adapter).
-It is also highly experimental. For best overall quality, training on FLUX.1-dev is recommended.
-
-To use it, You just need to add the assistant to the `model` section of your config file like so:
-
+Specifies search space and trial count:
 ```yaml
-      model:
-        name_or_path: "black-forest-labs/FLUX.1-schnell"
-        assistant_lora_path: "ostris/FLUX.1-schnell-training-adapter"
-        is_flux: true
-        quantize: true
+optimize:
+  trials: 10
+  rank: [4, 8, 16, 32]
+  lr: [5e-5, 1e-4, 2e-4]
+  dropout: [0.05, 0.1, 0.2]
+  batch_size: [1, 2, 4]
+``` 
+
+---
+
+## CLI Usage
+
+### 1. Fine-Tuning (TrainJob)
+
+```bash
+python run.py config/schnell_config.yaml
+# or with accelerate for distributed:
+accelerate launch run.py config/schnell_config.yaml
 ```
 
-You also need to adjust your sample steps since schnell does not require as many
+Outputs:
+- Checkpoints and samples under `output/<timestamp>/`
+- Optional HF Hub push if configured.
 
+### 2. Hyperparameter Optimization (OptimizeJob)
+
+```bash
+python optimize_run.py
+# or accelerate:
+accelerate launch optimize_run.py
+```
+
+Generates:
+- CSV of trial results
+- Markdown & PDF reports in `outputs/Optimize_Reports/`
+- Plots: cost vs. metric, hyperopt summary.
+
+### 3. Cost Benchmarking (CostBenchmarkJob)
+
+Configure `config/cost_benchmark.yaml`:
 ```yaml
-      sample:
-        guidance_scale: 1  # schnell does not do guidance
-        sample_steps: 4  # 1 - 4 works well
+cost_benchmark:
+  base_config_file: config/schnell_config.yaml
+  providers:
+    - name: runpod, cost_per_sec: 0.05, throughput_ratio: 1.0
+    - name: aws_g5, cost_per_sec: 0.03, throughput_ratio: 0.8
+  datasets:
+    - name: Baroque, metadata_file: Baroque/metadata.json, gt_dir: Baroque/gt, prompts_file: Baroque/prompts.txt
+  output_dir: outputs/Cost_Benchmarks
 ```
 
-### Training
-1. Copy the example config file located at `config/examples/train_lora_flux_24gb.yaml` (`config/examples/train_lora_flux_schnell_24gb.yaml` for schnell) to the `config` folder and rename it to `whatever_you_want.yml`
-2. Edit the file following the comments in the file
-3. Run the file like so `python run.py config/whatever_you_want.yml`
-
-A folder with the name and the training folder from the config file will be created when you start. It will have all 
-checkpoints and images in it. You can stop the training at any time using ctrl+c and when you resume, it will pick back up
-from the last checkpoint.
-
-IMPORTANT. If you press crtl+c while it is saving, it will likely corrupt that checkpoint. So wait until it is done saving
-
-### Need help?
-
-Please do not open a bug report unless it is a bug in the code. You are welcome to [Join my Discord](https://discord.gg/VXmU2f5WEU)
-and ask for help there. However, please refrain from PMing me directly with general question or support. Ask in the discord
-and I will answer when I can.
-
-
-## Training in RunPod
-Example RunPod template: **runpod/pytorch:2.2.0-py3.10-cuda12.1.1-devel-ubuntu22.04**
-> You need a minimum of 24GB VRAM, pick a GPU by your preference.
-
-#### Example config ($0.5/hr):
-- 1x A40 (48 GB VRAM)
-- 19 vCPU 100 GB RAM
-
-#### Custom overrides (you need some storage to clone FLUX.1, store datasets, store trained models and samples):
-- ~120 GB Disk
-- ~120 GB Pod Volume
-- Start Jupyter Notebook
-
-### 1. Setup
+Run:
+```bash
+python run.py config/cost_benchmark.yaml
 ```
-git clone https://github.com/ostris/ai-toolkit.git
-cd ai-toolkit
-git submodule update --init --recursive
-python -m venv venv
-source venv/bin/activate
-pip install torch
-pip install -r requirements.txt
-pip install --upgrade accelerate transformers diffusers huggingface_hub 
-apt-get update && apt-get install -y libgl1
+
+Generate report in Python:
+```python
+from jobs.CostBenchmarkJob import CostBenchmarkJob
+job = CostBenchmarkJob(config)
+job.run()
+job.create_extensive_report()
 ```
-### 2. Upload your dataset
-- Create a new folder in the root, name it `dataset` or whatever you like.
-- Drag and drop your .jpg, .jpeg, or .png images and .txt files inside the newly created dataset folder.
 
-### 3. Login into Hugging Face with an Access Token
-- Get a READ token from [here](https://huggingface.co/settings/tokens) and request access to Flux.1-dev model from [here](https://huggingface.co/black-forest-labs/FLUX.1-dev).
-- Run ```huggingface-cli login``` and paste your token.
+Reports saved to `outputs/Cost_Benchmarks/`.
 
-### 4. Training
-- Copy an example config file located at ```config/examples``` to the config folder and rename it to ```whatever_you_want.yml```.
-- Edit the config following the comments in the file.
-- Change ```folder_path: "/path/to/images/folder"``` to your dataset path like ```folder_path: "/workspace/ai-toolkit/your-dataset"```.
-- Run the file: ```python run.py config/whatever_you_want.yml``` or ```accelerate launch run.py config/schnell_config.yaml```.
+### 4. Custom Benchmarks (BenchmarkJob)
 
-### Screenshot from RunPod
-<img width="1728" alt="RunPod Training Screenshot" src="https://github.com/user-attachments/assets/53a1b8ef-92fa-4481-81a7-bde45a14a7b5">
+Use `jobs/BenchmarkJob.py` for generic performance tests across datasets/providers. Refer to docstring for parameters.
+
+---
+
+## Toolkit Module Reference
+
+### `toolkit/config.py`
+
+- `get_config(path)`: loads YAML/JSON into nested `OrderedDict`.
+
+### `toolkit/data_loader.py`
+
+- `get_dataloader_from_datasets(...)`: returns PyTorch DataLoader with optional caching.
+- Supports resolution bucketing, latent caching, dropout.
+
+### `toolkit/patch_lora.py`
+
+- Injects LoRA adapters into UNet layers via `lora_special` or `lycoris_special`.
+
+### `toolkit/metrics.py`
+
+- `compute_mse`, `compute_clip_score`, `compute_fid`, `compute_is`.
+- Utilizes `torchmetrics` and `openai/clip`.
+
+### `toolkit/training/train.py`
+
+- `TrainLoop` class: handles step loop, EMA, logging, checkpointing, sampling.
+
+### `toolkit/optimizer.py`
+
+- Factory for optimizers: supports `adamw8bit`, `adamw`, etc.
+
+---
+
+## Jupyter Notebooks
+
+- **Hyperopt_Demo.ipynb**: runs a hyperparameter search and visualizes results.
+- **Art_Style_Evaluation.ipynb**: loads style metadata, computes metrics, plots style comparisons.
+- **HF_Upload_Inference_Demo.ipynb**: demonstrates pushing to HF and inference.
+
+---
+
+## Testing & CI
+
+- Run all tests:
+```bash
+pytest tests/
+```
+- Lint & format:
+```bash
+flake8 .
+black .
+```
+- CI workflows in `.github/workflows/` for linting, testing, and docs.
+
+---
+
+## Contributing
+
+1. Fork this repo and create a feature branch.
+2. Add unit tests for new functionality.
+3. Open a PR against `main` with a clear description.
+
+---
+
+## License
+
+Apache-2.0  Black Forest Labs

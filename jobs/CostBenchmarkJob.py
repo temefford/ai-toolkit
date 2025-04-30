@@ -34,17 +34,98 @@ class CostBenchmarkJob(BaseJob):
       output_dir: path for results
     """
 
-    def __init__(self, config: OrderedDict):
-        super().__init__(config)
-        cb = self.get_conf('cost_benchmark', required=True)
-        self.base_config_file = cb.get('base_config_file')
-        self.providers = cb.get('providers', [])
-        self.datasets = cb.get('datasets', [])
-        self.performance_target = cb.get('performance_target', {})
-        self.output_dir = cb.get('output_dir', 'cost_benchmark')
-        os.makedirs(self.output_dir, exist_ok=True)
-        self.device = self.get_conf('device', 'cpu')
-        self.records = []
+    def create_extensive_report(self):
+        import datetime
+        from reportlab.lib.pagesizes import letter
+        from reportlab.pdfgen import canvas
+        from PIL import Image
+        import pandas as pd
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+        import os
+
+        # Ensure output directory is outputs/Cost_Benchmarks
+        base_output_dir = os.path.join('outputs', 'Cost_Benchmarks')
+        os.makedirs(base_output_dir, exist_ok=True)
+        self.output_dir = base_output_dir
+
+        timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        df = pd.DataFrame(self.records)
+        md_lines = []
+        md_lines.append(f"# Cost Benchmark Report ({timestamp})\n")
+        md_lines.append(f"## Providers\n")
+        for prov in self.providers:
+            md_lines.append(f"- **{prov['name']}**: ${prov.get('cost_per_sec', 0):.5f}/sec, throughput ratio: {prov.get('throughput_ratio', 1.0)}")
+        md_lines.append(f"\n## Datasets\n")
+        for ds in self.datasets:
+            md_lines.append(f"- **{ds['name']}**: metadata: {ds.get('metadata_file','')}, GT: {ds.get('gt_dir','')}, prompts: {ds.get('prompts_file','')}")
+        md_lines.append(f"\n## Results Table\n")
+        md_lines.append(df.to_markdown(index=False))
+
+        # Plots
+        plot_paths = []
+        sns.set(style='whitegrid')
+        # Cost per dataset per provider
+        plt.figure(figsize=(8, 6))
+        sns.barplot(data=df, x='dataset', y='cost_usd', hue='provider')
+        plt.title('Cost per Dataset by Provider')
+        plot1 = os.path.join(self.output_dir, f"cost_comparison_{timestamp}.png")
+        plt.savefig(plot1)
+        plt.close()
+        plot_paths.append(plot1)
+        md_lines.append(f"\n![Cost per Dataset by Provider]({os.path.basename(plot1)})\n")
+
+        # Cost vs performance (if available)
+        metric_key = None
+        for k in ['clip', 'psnr', 'ssim', 'fid', 'accuracy']:
+            if k in df.columns:
+                metric_key = k
+                break
+        if metric_key:
+            plt.figure(figsize=(8, 6))
+            sns.scatterplot(data=df, x='cost_usd', y=metric_key, hue='provider', style='dataset', s=100)
+            plt.title(f"Cost vs {metric_key}")
+            plot2 = os.path.join(self.output_dir, f"cost_vs_{metric_key}_{timestamp}.png")
+            plt.savefig(plot2)
+            plt.close()
+            plot_paths.append(plot2)
+            md_lines.append(f"\n![Cost vs {metric_key}]({os.path.basename(plot2)})\n")
+
+        # Save markdown
+        md_report = '\n'.join(md_lines)
+        md_path = os.path.join(self.output_dir, f"cost_benchmark_report_{timestamp}.md")
+        with open(md_path, 'w') as f:
+            f.write(md_report)
+        print(f"Saved markdown report to {md_path}")
+
+        # Try to export PDF
+        try:
+            pdf_path = os.path.join(self.output_dir, f"cost_benchmark_report_{timestamp}.pdf")
+            c = canvas.Canvas(pdf_path, pagesize=letter)
+            width, height = letter
+            textobject = c.beginText(40, height-40)
+            for line in md_report.split('\n'):
+                textobject.textLine(line)
+            c.drawText(textobject)
+            # Insert each plot image
+            y_cursor = height-400
+            for plot in plot_paths:
+                if os.path.exists(plot):
+                    img = Image.open(plot)
+                    img_width, img_height = img.size
+                    aspect = img_height / img_width
+                    pdf_img_width = width - 80
+                    pdf_img_height = pdf_img_width * aspect
+                    if y_cursor - pdf_img_height < 40:
+                        c.showPage()
+                        y_cursor = height-40
+                    c.drawInlineImage(plot, 40, y_cursor-pdf_img_height, width=pdf_img_width, height=pdf_img_height)
+                    y_cursor -= (pdf_img_height + 40)
+            c.showPage()
+            c.save()
+            print(f"Saved PDF report to {pdf_path}")
+        except Exception as e:
+            print(f"Could not generate PDF: {e}\nInstall reportlab and pillow for PDF export.")
 
     def run(self):
         super().run()

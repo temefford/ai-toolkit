@@ -32,10 +32,16 @@ class OptimizeJob(BaseJob):
 
     def run(self):
         super().run()
+        import gc
+        import torch
         trials = int(self.optimize_cfg.get('trials', len(self.optimize_cfg.get('rank', []))))
         results = []
 
         for i in range(trials):
+            # Memory cleanup before starting a new training job
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
             # sample hyperparameters from nested process[0]
             base_proc = self.base_cfg['process'][0]
             rank = random.choice(self.optimize_cfg.get('rank', [base_proc['network']['linear']]))
@@ -58,6 +64,10 @@ class OptimizeJob(BaseJob):
             job = get_job(full_conf, None)
             job.run()
             job.cleanup()
+            # Memory cleanup after finishing a training job
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
             duration = time.time() - start_ts
 
             # placeholder for metrics - processes may define attributes
