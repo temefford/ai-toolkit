@@ -1,7 +1,7 @@
 # Hyperparameter optimization parameters for OptimizeJob
 optimize:
-  trials: 10
-  rank: [4, 8, 16, 32]
+  trials: 5
+  rank: [2, 4, 8]
   lr: [5e-5, 1e-4, 2e-4]
   dropout: [0.05, 0.1, 0.2]
   batch_size: [1, 2, 4]

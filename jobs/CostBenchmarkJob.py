@@ -170,6 +170,7 @@ class CostBenchmarkJob(BaseJob):
                 cost_usd = (elapsed / throughput) * cost_rate
 
                 # run evaluation on validation set
+                os.makedirs(exp_dir, exist_ok=True)
                 eval_conf = {
                     'job': 'evaluation',
                     'config': {
