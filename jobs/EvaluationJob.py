@@ -114,17 +114,26 @@ class EvaluationJob(BaseJob):
         print(f'Saved results CSV: {csv_path}')
 
         sns.set(style='whitegrid')
-        val_df = df[df['evaluation_type']=='validation']
-        if not val_df.empty:
-            plt.figure(figsize=(8,6))
-            sns.scatterplot(data=val_df, x='time_sec', y='clip', hue='checkpoint', s=100)
-            plt.title('Validation CLIP vs Time')
-            plt.xlabel('Time (s)')
-            plt.ylabel('CLIP Score')
-            plt.savefig(os.path.join(out_dir, f'{self.name}_validation_clip_time.png'))
+        if 'evaluation_type' in df.columns:
+            val_df = df[df['evaluation_type'] == 'validation']
+            if not val_df.empty:
+                plt.figure(figsize=(8,6))
+                sns.scatterplot(data=val_df, x='time_sec', y='clip', hue='checkpoint', s=100)
+                plt.title('Validation CLIP vs Time')
+                plt.xlabel('Time (s)')
+                plt.ylabel('CLIP Score')
+                plt.savefig(os.path.join(out_dir, f'{self.name}_validation_clip_time.png'))
+        else:
+            print("Warning: 'evaluation_type' column missing from evaluation results.")
 
-        style_df = df[df['evaluation_type'].str.startswith('style_')]
-        if not style_df.empty:
+        if 'evaluation_type' in df.columns:
+            style_df = df[df['evaluation_type'].str.startswith('style_')]
+            if not style_df.empty:
+                style_df['style'] = style_df['evaluation_type'].str.replace('style_', '')
+                plt.figure(figsize=(10,6))
+                sns.barplot(data=style_df, x='style', y='clip', hue='checkpoint')
+                plt.title('Art Style CLIP Scores by Checkpoint')
+                plt.savefig(os.path.join(out_dir, f'{self.name}_style_clip.png'))
             style_df['style'] = style_df['evaluation_type'].str.replace('style_', '')
             plt.figure(figsize=(10,6))
             sns.barplot(data=style_df, x='style', y='clip', hue='checkpoint')
