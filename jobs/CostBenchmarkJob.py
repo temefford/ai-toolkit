@@ -166,6 +166,10 @@ class CostBenchmarkJob(BaseJob):
                 ds_name = ds.get('name')
                 # Prepare training config copy
                 cfg_copy = copy.deepcopy(base_cfg)
+                # disable all sampling to prevent hangs
+                cfg_copy.setdefault('train', {})
+                cfg_copy['train']['skip_first_sample'] = True
+                cfg_copy['train']['disable_sampling'] = True
                 if 'datasets' in cfg_copy and cfg_copy['datasets']:
                     cfg_copy['datasets'][0]['metadata_file'] = ds.get('metadata_file')
                 exp_dir = os.path.join(self.output_dir, f"{self.hardware}_{pname}_{ds_name}_{timestamp}")

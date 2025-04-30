@@ -1,17 +1,19 @@
-job: "cost_benchmark"
-config:
-  name: "cost_benchmark"
-  base_config_file: "config/schnell_config.yaml"
-  providers:
-    - name: "runpod"
-      cost_per_sec: 0.08333
-      throughput_ratio: 1.0
-    - name: "aws_g5"
-      cost_per_sec: 0.03
-      throughput_ratio: 0.8
-  datasets:
-    - name: "Baroque"
-      metadata_file: "Baroque/metadata.json"
-      gt_dir: "Baroque/gt"
-      prompts_file: "Baroque/prompts.txt"
-  output_dir: "outputs/Cost_Benchmarks"
+cost_benchmark:
+  job: "cost_benchmark"
+  config:
+    name: "cost_benchmark"
+    hardware: "runpod"
+    base_config_file: "config/schnell_config.yaml"
+    providers:
+      - name: "runpod"
+        cost_per_sec: 0.08333
+        throughput_ratio: 1.0
+      - name: "aws_g5"
+        cost_per_sec: 0.03
+        throughput_ratio: 0.8
+    datasets:
+      - name: "Baroque"
+        metadata_file: "Baroque/metadata.json"
+        gt_dir: "Baroque/gt"
+        prompts_file: "Baroque/prompts.txt"
+    output_dir: "outputs/Cost_Benchmarks"
