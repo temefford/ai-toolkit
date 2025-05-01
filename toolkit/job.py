@@ -30,6 +30,9 @@ def get_job(
     if job == 'cost_benchmark':
         from jobs.CostBenchmarkJob import CostBenchmarkJob
         return CostBenchmarkJob(config)
+    if job == 'benchmark':
+        from jobs.BenchmarkJob import BenchmarkJob
+        return BenchmarkJob(config)
 
     # elif job == 'train':
     #     from jobs import TrainJob
