@@ -66,6 +66,11 @@ class BenchmarkJob(BaseJob):
                 for key, val in section_conf.items():
                     hyperparams[f'{section}_{key}'] = val
             metrics_dict.update(hyperparams)
+            # explicitly include selected train hyperparameters
+            train_conf = self.config.get('train', {})
+            for key in ['batch_size', 'steps', 'gradient_accumulation_steps', 'train_unet', 'noise_scheduler', 'optimizer', 'lr']:
+                if key in train_conf:
+                    metrics_dict[key] = train_conf[key]
             df = pd.DataFrame([metrics_dict])
             csv_path = Path(self.training_folder) / f"{self.name}_benchmark_results.csv"
             df.to_csv(csv_path, index=False)
