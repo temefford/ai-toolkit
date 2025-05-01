@@ -3,10 +3,9 @@ job: benchmark
 config:
   # this name will be the folder and filename name
   name: "benchmark"
+  training_folder: "output"
   process:
     - type: 'sd_trainer'
-      # root folder to save training sessions/samples/weights
-      training_folder: "output"
       # uncomment to see performance stats in the terminal every N steps
 #      performance_log_every: 1000
       device: cuda:0
