@@ -3,6 +3,7 @@ from jobs import BaseJob
 from toolkit.extension import get_all_extensions_process_dict
 from collections import OrderedDict
 from datetime import datetime
+import time
 
 class BenchmarkJob(BaseJob):
     def __init__(self, config: OrderedDict):
@@ -11,6 +12,8 @@ class BenchmarkJob(BaseJob):
         self.is_v2 = self.get_conf('is_v2', False)
         self.log_dir = self.get_conf('log_dir', None)
         self.device = self.get_conf('device', 'cpu')
+        # GPU cost per second (e.g. runpod rate)
+        self.gpu_cost_per_second = self.get_conf('gpu_cost_per_second', 0.0083)
         self.process_dict = get_all_extensions_process_dict()
         self.load_processes(self.process_dict)
 
@@ -19,6 +22,12 @@ class BenchmarkJob(BaseJob):
 
         print("")
         print(f"Running  {len(self.process)} process{'' if len(self.process) == 1 else 'es'}")
-
+        # start timer for fine-tuning run
+        start_time = time.time()
         for process in self.process:
             process.run()
+        # end timer and compute cost
+        end_time = time.time()
+        duration = end_time - start_time
+        cost = duration * self.gpu_cost_per_second
+        print(f"Fine-tuning run time: {duration:.2f}s, cost: ${cost:.4f}")
