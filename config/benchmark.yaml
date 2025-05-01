@@ -77,9 +77,9 @@ config:
         prompts:
           # you can add [trigger] to the prompts here and it will be replaced with the trigger word
 #          - "[trigger] holding a sign that says 'I LOVE PROMPTS!'"\
-          - "woman with red hair, playing chess at the park, bomb going off in the background"
-          - "a woman holding a coffee cup, in a beanie, sitting at a cafe"
-          - "a horse is a DJ at a night club, fish eye lens, smoke machine, lazer lights, holding a martini"
+          - "The Raising of Lazarus by Rembrandt, Baroque (1630)"
+          - "Bust of an Old Woman, Rembrandt`s Mother"
+          - "Self-portrait with plumed cap and lowered sabre by Rembrandt, Baroque"
           - "a man showing off his cool new t shirt at the beach, a shark is jumping out of the water in the background"
           - "a bear building a log cabin in the snow covered mountains"
           - "woman playing the guitar, on stage, singing a song, laser lights, punk rocker"
