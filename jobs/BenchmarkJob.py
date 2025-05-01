@@ -59,6 +59,13 @@ class BenchmarkJob(BaseJob):
             print(f'  FID: {fid_score:.4f}')
             # save metrics and generate analysis
             metrics_dict = {'duration_s': duration, 'cost_$': cost, 'MSE': mse, 'CLIP': clip, 'IS_mean': is_mean, 'IS_std': is_std, 'FID': fid_score}
+            # include hyperparameters from config
+            hyperparams = {}
+            for section in ['train', 'sample', 'model']:
+                section_conf = self.config.get(section, {})
+                for key, val in section_conf.items():
+                    hyperparams[f'{section}_{key}'] = val
+            metrics_dict.update(hyperparams)
             df = pd.DataFrame([metrics_dict])
             csv_path = Path(self.training_folder) / f"{self.name}_benchmark_results.csv"
             df.to_csv(csv_path, index=False)
