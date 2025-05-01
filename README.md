@@ -130,34 +130,61 @@ Generates:
 
 ### 3. Cost Benchmarking (CostBenchmarkJob)
 
-Configure `config/cost_benchmark.yaml`:
+This job runs identical fine-tuning and evaluation across multiple hardware providers and datasets and aggregates cost (USD) vs. performance metrics.
+
+Sample config (`config/cost_benchmark.yaml`):
 ```yaml
-cost_benchmark:
-  base_config_file: config/schnell_config.yaml
+job: "cost_benchmark"
+config:
+  name: "cost_benchmark"
+  hardware: "runpod"
+  base_config_file: "config/schnell_config.yaml"
   providers:
-    - name: runpod, cost_per_sec: 0.05, throughput_ratio: 1.0
-    - name: aws_g5, cost_per_sec: 0.03, throughput_ratio: 0.8
+    - name: "runpod"
+      cost_per_sec: 0.08333
+      throughput_ratio: 1.0
+    - name: "aws_g5"
+      cost_per_sec: 0.03
+      throughput_ratio: 0.8
   datasets:
-    - name: Baroque, metadata_file: Baroque/metadata.json, gt_dir: Baroque/gt, prompts_file: Baroque/prompts.txt
-  output_dir: outputs/Cost_Benchmarks
+    - name: "Baroque"
+      metadata_file: "Baroque/metadata.json"
+      gt_dir: "Baroque/gt"
+      prompts_file: "Baroque/prompts.txt"
+  output_dir: "outputs/Cost_Benchmarks"
 ```
 
-Run:
+**Run benchmark:**
 ```bash
 python run.py config/cost_benchmark.yaml
-# or with accelerate:
+# or distributed
 accelerate launch run.py config/cost_benchmark.yaml
 ```
 
-Generate report in Python:
-```python
+For each provider–dataset pair, a subfolder is created under the configured `output_dir` with the pattern:
+```
+<output_dir>/<hardware>_<provider>_<dataset>_<timestamp>/
+```
+Inside each subfolder you'll find:
+- Model checkpoints (`*.safetensors`)
+- Sample images and training logs
+
+After training and evaluation complete, generate an aggregated report:
+```bash
+python - <<EOF
+from toolkit.config import get_config
 from jobs.CostBenchmarkJob import CostBenchmarkJob
-job = CostBenchmarkJob(config)
+cfg = get_config("config/cost_benchmark.yaml")
+job = CostBenchmarkJob(cfg)
 job.run()
 job.create_extensive_report()
+EOF
 ```
 
-Reports saved to `outputs/Cost_Benchmarks/`.
+Report artifacts are saved in `outputs/Cost_Benchmarks/`:
+- Markdown: `cost_benchmark_report_<timestamp>.md`
+- PDF: `cost_benchmark_report_<timestamp>.pdf`
+- Plots: `cost_comparison_<timestamp>.png`, `cost_vs_<metric>_<timestamp>.png`
 
 ### 4. Custom Benchmarks (BenchmarkJob)
 
