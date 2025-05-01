@@ -7,6 +7,9 @@ from datetime import datetime
 class BenchmarkJob(BaseJob):
     def __init__(self, config: OrderedDict):
         super().__init__(config)
+        self.training_folder = self.get_conf('training_folder', required=True)
+        self.is_v2 = self.get_conf('is_v2', False)
+        self.log_dir = self.get_conf('log_dir', None)
         self.device = self.get_conf('device', 'cpu')
         self.process_dict = get_all_extensions_process_dict()
         self.load_processes(self.process_dict)
@@ -19,4 +22,3 @@ class BenchmarkJob(BaseJob):
 
         for process in self.process:
             process.run()
-
