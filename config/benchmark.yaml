@@ -1,6 +1,6 @@
-job: "cost_benchmark"
+job: "benchmark"
 config:
-  name: "cost_benchmark"
+  name: "benchmark"
   hardware: "runpod"
   base_config_file: "config/schnell_config.yaml"
   providers:
@@ -16,8 +16,8 @@ config:
       gt_dir: "Baroque/gt"
       prompts_file: "Baroque/prompts.txt"
       process:
-        - type: 'sd_trainer'
-          training_folder: "outputs/Cost_Benchmarks/Baroque"
+        - type: 'sd_trainer'  
+          training_folder: "outputs/Benchmarks/Baroque"
           device: cuda:0
           network:
             type: "lora"
@@ -50,4 +50,4 @@ config:
             ema_config:
               use_ema: true
               ema_decay: 0.99
-  output_dir: "outputs/Cost_Benchmarks"
+  output_dir: "outputs/Benchmarks"
