@@ -747,8 +747,8 @@ class BaseSDTrainProcess(BaseTrainProcess):
         return None
 
     def hook_train_loop(self, batch):
-        # return loss
-        return 0.0
+        # return a dict with loss value for compatibility
+        return {'loss': 0.0}
     
     def hook_after_sd_init_before_load(self):
         pass
