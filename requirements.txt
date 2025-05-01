@@ -39,6 +39,8 @@ pytorch-wavelets==1.3.0
 matplotlib==3.10.1
 seaborn
 markdown2
+torchmetrics[image]
+torch-fidelity
 reportlab
 pillow
 packaging

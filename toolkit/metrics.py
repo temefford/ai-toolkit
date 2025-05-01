@@ -6,6 +6,14 @@ from torchmetrics.image.fid import FrechetInceptionDistance
 from transformers import CLIPProcessor, CLIPModel
 
 # Utility to convert PIL image to normalized tensor
+def pil_to_tensor_uint8(image: Image.Image, device: torch.device=None) -> torch.Tensor:
+    image = image.convert('RGB')
+    arr = np.array(image).transpose(2, 0, 1)  # C,H,W
+    tensor = torch.from_numpy(arr).to(torch.uint8)
+    if device:
+        tensor = tensor.to(device)
+    return tensor
+
 def pil_to_tensor(image: Image.Image, device: torch.device=None) -> torch.Tensor:
     image = image.convert('RGB')
     arr = np.array(image).transpose(2, 0, 1)  # C,H,W
@@ -49,13 +57,13 @@ def compute_inception_score(images: list[Image.Image], device: torch.device=None
 
 # 4. Fréchet Inception Distance between real and generated images
 def compute_fid(gt_images: list[Image.Image], gen_images: list[Image.Image], device: torch.device=None) -> float:
-    # Convert and resize
-    gt_tensors = [pil_to_tensor(img, device=device) for img in gt_images]
-    gen_tensors = [pil_to_tensor(img, device=device) for img in gen_images]
+    # Convert and resize to uint8 [0,255] for torch-fidelity
+    gt_tensors = [pil_to_tensor_uint8(img, device=device) for img in gt_images]
+    gen_tensors = [pil_to_tensor_uint8(img, device=device) for img in gen_images]
     gt_batch = torch.stack(gt_tensors)
     gen_batch = torch.stack(gen_tensors)
-    gt_batch = torch.nn.functional.interpolate(gt_batch, size=(299, 299), mode='bilinear', align_corners=False)
-    gen_batch = torch.nn.functional.interpolate(gen_batch, size=(299, 299), mode='bilinear', align_corners=False)
+    gt_batch = torch.nn.functional.interpolate(gt_batch.float(), size=(299, 299), mode='bilinear', align_corners=False).to(torch.uint8)
+    gen_batch = torch.nn.functional.interpolate(gen_batch.float(), size=(299, 299), mode='bilinear', align_corners=False).to(torch.uint8)
     fid_metric = FrechetInceptionDistance(feature=2048).to(device) if device else FrechetInceptionDistance(feature=2048)
     fid_metric.update(gt_batch, real=True)
     fid_metric.update(gen_batch, real=False)

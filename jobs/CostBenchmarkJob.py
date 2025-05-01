@@ -166,7 +166,7 @@ class CostBenchmarkJob(BaseJob):
                 ds_name = ds.get('name')
                 # Prepare training config copy
                 cfg_copy = copy.deepcopy(base_cfg)
-                # disable all sampling to prevent hangs
+                # disable baseline sampling to avoid hanging
                 cfg_copy.setdefault('train', {})
                 cfg_copy['train']['skip_first_sample'] = True
                 cfg_copy['train']['disable_sampling'] = True
