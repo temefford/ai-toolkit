@@ -60,8 +60,10 @@ class BenchmarkJob(BaseJob):
             prompts = eval_conf.get('prompts', [])
             if not gt_folder or not gen_folder:
                 raise ValueError('evaluation config requires ground_truth_folder and generated_folder')
-            gt_paths = sorted(Path(gt_folder).glob('*'))
-            gen_paths = sorted(Path(gen_folder).glob('*'))
+            # only include image files for evaluation
+            valid_suffixes = {'.jpg', '.jpeg', '.png'}
+            gt_paths = sorted([p for p in Path(gt_folder).iterdir() if p.suffix.lower() in valid_suffixes])
+            gen_paths = sorted([p for p in Path(gen_folder).iterdir() if p.suffix.lower() in valid_suffixes])
             gt_images = [Image.open(str(p)) for p in gt_paths]
             gen_images = [Image.open(str(p)) for p in gen_paths]
             mse = compute_validation_mse(gt_images, gen_images)
