@@ -18,11 +18,11 @@ config:
         linear_alpha: 16
       save:
         dtype: float16 # precision to save
-        save_every: 2000 # save every this many steps
+        save_every: 1000 # save every this many steps
         max_step_saves_to_keep: 4 # how many intermittent saves to keep
         push_to_hub: true #change this to True to push your trained model to Hugging Face.
         # You can either set up a HF_TOKEN env variable or you'll be prompted to log-in         
-        hf_repo_id: TheoMefff/flux_schnell_baroque
+        hf_repo_id: TheoMefff/flux_schnell_baroque_runpod
         hf_private: true #whether the repo is private or public        
       datasets:
         # datasets are a folder of images. captions need to be txt files with the same name as the image
@@ -37,8 +37,8 @@ config:
           cache_latents_to_disk: true  # leave this true unless you know what you're doing
           resolution: [ 1024 ]  # flux enjoys multiple resolutions
       train:
-        batch_size: 4
-        steps: 2000  # total number of steps to train 500 - 4000 is a good range
+        batch_size: 2
+        steps: 1000  # total number of steps to train 500 - 4000 is a good range
         gradient_accumulation_steps: 1
         train_unet: true
         train_text_encoder: false  # probably won't work with flux
