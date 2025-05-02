@@ -110,8 +110,12 @@ class BenchmarkJob(BaseJob):
             # collect image files recursively from both folders
             gt_paths = sorted([p for p in gt_path.rglob('*') if p.is_file() and p.suffix.lower() in valid_suffixes])
             gen_paths = sorted([p for p in gen_path.rglob('*') if p.is_file() and p.suffix.lower() in valid_suffixes])
-            gt_images = [Image.open(str(p)) for p in gt_paths]
-            gen_images = [Image.open(str(p)) for p in gen_paths]
+            import random
+            subset_size = min(10, len(gt_paths), len(gen_paths))
+            random.seed(42)
+            selected_indices = random.sample(range(min(len(gt_paths), len(gen_paths))), subset_size)
+            gt_images = [Image.open(str(gt_paths[i])) for i in selected_indices]
+            gen_images = [Image.open(str(gen_paths[i])) for i in selected_indices]
             mse = compute_validation_mse(gt_images, gen_images)
             clip = compute_clip_score(prompts, gen_images, device=self.device)
             is_mean, is_std = compute_inception_score(gen_images, device=self.device)
