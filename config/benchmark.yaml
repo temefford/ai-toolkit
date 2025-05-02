@@ -96,7 +96,7 @@ config:
         sample_steps: 4  # 1 - 4 works well
   evaluation:
     ground_truth_folder: "Baroque"
-    generated_folder: "output/Baroque"
+    generated_folder: "output/benchmark"
     prompts:
           - "The Raising of Lazarus by Rembrandt, Baroque (1630)"
           - "Bust of an Old Woman, Rembrandt`s Mother"
