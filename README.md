@@ -226,6 +226,88 @@ black .
 
 ---
 
+## Running in Rackspace Private Cloud
+
+### OpenStack Instance Setup
+
+Rackspace Private Cloud uses OpenStack for VM provisioning. Here’s a recommended workflow for setting up a training instance:
+
+- **UEFI/Secure Boot:** By default, if UEFI is enabled on the image, secure boot is also enabled. To disable UEFI (and secure boot), add the `openstack` tag to the image before launching, or use an image with UEFI disabled.
+
+#### 1. Launch an Instance from an Existing Image
+```bash
+openstack server create --image <existing-image-id> --flavor <flavor-id> --network <network-id> <instance-name>
+```
+
+#### 2. Customize the Instance
+- SSH into the instance.
+- Install drivers, software, and make any desired configuration changes.
+
+#### 3. Create a Snapshot of the Modified Instance
+```bash
+openstack server image create --name <new-image-name> <instance-id>
+```
+
+You can now launch new instances from this custom image, ensuring all required drivers and settings are pre-installed.
+
+---
+
+The AI Toolkit can be deployed on Rackspace Private Cloud VMs or bare-metal servers. Below are best practices for installation and troubleshooting in this environment.
+
+### 1. System Preparation
+
+- **Recommended OS:** Ubuntu 22.04 or later
+- **Ensure you have root or sudo access**
+- **Install Python 3.10+ and development headers:**
+  ```bash
+  sudo apt update
+  sudo apt install python3.10 python3.10-venv python3.10-dev build-essential git
+  ```
+
+### 2. Disk Space Management
+
+- Rackspace VMs often have a small root (`/`) partition and a large data disk (e.g., `/data`).
+- **Clone your repo and create your virtual environment on `/data`** to avoid running out of space:
+  ```bash
+  cd /data
+  git clone https://github.com/temefford/ai-toolkit.git
+  cd ai-toolkit
+  python3 -m venv /data/venv
+  source /data/venv/bin/activate
+  pip install --upgrade pip
+  pip install --cache-dir=/data/pip_cache -r requirements.txt
+  ```
+
+### 3. Permissions
+
+If you see `Permission denied` errors when installing packages:
+```bash
+sudo chown -R $USER:$USER /data/venv
+```
+
+### 4. System Libraries
+
+Some Python packages require system libraries:
+```bash
+sudo apt-get install -y libgl1 libglib2.0-0
+```
+
+### 5. Troubleshooting
+- **No space left on device:** Move your venv and pip cache to `/data` as above.
+- **Python.h: No such file or directory:** Install `python3.10-dev` as shown.
+- **Pip install fails with permissions:** Use `chown` as above.
+
+### 6. Running Jobs
+
+```bash
+source /data/venv/bin/activate
+python run.py config/benchmark.yaml
+# or with accelerate
+accelerate launch run.py config/benchmark.yaml
+```
+
+---
+
 ## License
 
 Apache-2.0  Black Forest Labs

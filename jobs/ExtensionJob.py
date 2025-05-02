@@ -3,6 +3,7 @@ from collections import OrderedDict
 from jobs import BaseJob
 from toolkit.extension import get_all_extensions_process_dict
 from toolkit.paths import CONFIG_ROOT
+from pathlib import Path
 
 class ExtensionJob(BaseJob):
 

@@ -90,3 +90,10 @@ class BenchmarkJob(BaseJob):
             fig.savefig(plot_path)
             print(f"Saved metrics plot to {plot_path}")
             plt.close(fig)
+        # Print last .safetensors file saved
+        safetensors = list(Path(self.training_folder).rglob("*.safetensors"))
+        if safetensors:
+            last_safetensor = max(safetensors, key=lambda p: p.stat().st_mtime)
+            print(f"Last .safetensors file saved: {last_safetensor}")
+        else:
+            print("No .safetensors file found in training folder.")
