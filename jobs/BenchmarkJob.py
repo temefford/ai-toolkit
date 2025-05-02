@@ -9,6 +9,8 @@ from PIL import Image
 from toolkit.metrics import compute_validation_mse, compute_clip_score, compute_inception_score, compute_fid
 import pandas as pd
 import matplotlib.pyplot as plt
+import os
+from huggingface_hub import HfApi, login
 
 class BenchmarkJob(BaseJob):
     def __init__(self, config: OrderedDict):
@@ -79,10 +81,79 @@ class BenchmarkJob(BaseJob):
             csv_path = Path(self.training_folder) / f"{self.name}_benchmark_results.csv"
             df.to_csv(csv_path, index=False)
             print(f"Saved results CSV to {csv_path}")
+
+            # --- Compile Markdown Report ---
+            results_dir = Path('results/benchmarks')
+            results_dir.mkdir(parents=True, exist_ok=True)
+            timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
+            hardware_name = hardware if hardware else 'unknown_hardware'
+            md_filename = f"{hardware_name}_{timestamp}.md"
+            md_path = results_dir / md_filename
+            # Markdown content
+            md_content = f"""
+# Benchmark Results ({hardware_name}) - {timestamp}
+
+## Metrics
+
+| Metric | Value |
+|--------|-------|
+"""
+            for k, v in metrics_dict.items():
+                md_content += f"| {k} | {v} |\n"
             # summary statistics
             stats = df.describe().T
             print("Metrics summary:")
             print(stats.to_string())
+            # plot metrics
+            fig, ax = plt.subplots(figsize=(8, 4))
+            df.T.plot(kind='bar', legend=False, ax=ax)
+            ax.set_title("Benchmark Metrics")
+            ax.set_ylabel("Value")
+            plt.xticks(rotation=45, ha='right')
+            fig.tight_layout()
+            plot_path = Path(self.training_folder) / f"{self.name}_benchmark_metrics.png"
+            fig.savefig(plot_path)
+            print(f"Saved metrics plot to {plot_path}")
+            plt.close(fig)
+            md_content += f"\n## Plot\n\n![]({plot_path})\n"
+            md_content += f"\n## CSV\n\nResults CSV: `{csv_path}`\n"
+            # Find last safetensor
+            safetensors = list(Path(self.training_folder).rglob("*.safetensors"))
+            if safetensors:
+                last_safetensor = max(safetensors, key=lambda p: p.stat().st_mtime)
+                md_content += f"\n## Model\n\nLast .safetensors file: `{last_safetensor}`\n"
+            else:
+                last_safetensor = None
+                md_content += "\nNo .safetensors file found in training folder.\n"
+            with open(md_path, 'w') as f:
+                f.write(md_content)
+            print(f"Saved markdown report to {md_path}")
+
+            # --- Push to Hugging Face Hub ---
+            hf_token = os.getenv("HF_TOKEN")
+            hf_repo_id = os.getenv("HF_REPO_ID") or self.config.get('save', {}).get('hf_repo_id')
+            if hf_token and hf_repo_id:
+                try:
+                    login(token=hf_token)
+                    api = HfApi()
+                    upload_files = [(md_path, md_path.name), (csv_path, csv_path.name)]
+                    if last_safetensor:
+                        upload_files.append((last_safetensor, last_safetensor.name))
+                    for local_path, repo_path in upload_files:
+                        print(f"Uploading {local_path} to HuggingFace repo {hf_repo_id}...")
+                        api.upload_file(
+                            path_or_fileobj=str(local_path),
+                            path_in_repo=repo_path,
+                            repo_id=hf_repo_id,
+                            repo_type="model",
+                            token=hf_token,
+                            commit_message=f"Add benchmark result: {repo_path} ({timestamp})"
+                        )
+                    print("Upload to HuggingFace complete!")
+                except Exception as e:
+                    print(f"Error uploading to HuggingFace: {e}")
+            else:
+                print("HF_TOKEN or HF_REPO_ID not set, skipping HuggingFace upload.")
             # plot metrics
             fig, ax = plt.subplots(figsize=(8, 4))
             df.T.plot(kind='bar', legend=False, ax=ax)

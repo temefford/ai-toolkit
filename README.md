@@ -40,9 +40,7 @@ ai-toolkit/
 │   ├── optimize_params.yaml    # Hyperopt search spaces and trials
 │   └── examples/            # Example YAML/JSON configs
 ├── notebooks/              # Demonstration notebooks
-│   ├── Hyperopt_Demo.ipynb
-│   ├── Art_Style_Evaluation.ipynb
-│   └── HF_Upload_Inference_Demo.ipynb
+│   ├── HF_Upload_Inference_Demo.ipynb
 ├── tests/                  # Unit tests for toolkit and jobs
 │   └── test_*.py
 ├── run.py                  # CLI for fine-tuning (alias for TrainJob)
@@ -53,7 +51,7 @@ ai-toolkit/
 
 ---
 
-## Installation
+## Runpod Installation
 
 ```bash
 git clone https://github.com/temefford/ai-toolkit.git
@@ -70,7 +68,7 @@ pip install --upgrade accelerate transformers diffusers huggingface_hub
 
 On Ubuntu/Debian:
 ```bash
-sudo apt-get update && sudo apt-get install -y libgl1 libglib2.0-0
+apt-get update && apt-get install -y libgl1 libglib2.0-0
 ```
 
 ---
@@ -128,40 +126,40 @@ Generates:
 - Markdown & PDF reports in `outputs/Optimize_Reports/`
 - Plots: cost vs. metric, hyperopt summary.
 
-### 3. Cost Benchmarking (CostBenchmarkJob)
+### 3. Benchmarking (BenchmarkJob)
 
-Configure `config/cost_benchmark.yaml`:
+Configure `config/benchmark.yaml`:
 ```yaml
-cost_benchmark:
+benchmark:
   base_config_file: config/schnell_config.yaml
   providers:
     - name: runpod, cost_per_sec: 0.05, throughput_ratio: 1.0
     - name: aws_g5, cost_per_sec: 0.03, throughput_ratio: 0.8
   datasets:
     - name: Baroque, metadata_file: Baroque/metadata.json, gt_dir: Baroque/gt, prompts_file: Baroque/prompts.txt
-  output_dir: outputs/Cost_Benchmarks
+  output_dir: outputs/Benchmarks
 ```
 
 Run:
 ```bash
-python run.py config/cost_benchmark.yaml
+python run.py config/benchmark.yaml
 # or with accelerate:
-accelerate launch run.py config/cost_benchmark.yaml
+accelerate launch run.py config/benchmark.yaml
 ```
 
 Generate report in Python:
 ```python
-from jobs.CostBenchmarkJob import CostBenchmarkJob
-job = CostBenchmarkJob(config)
+from jobs.BenchmarkJob import BenchmarkJob
+job = BenchmarkJob(config)
 job.run()
 job.create_extensive_report()
 ```
 
-Reports saved to `outputs/Cost_Benchmarks/`.
+Reports saved to `outputs/Benchmarks/`.
 
-### 4. Custom Benchmarks (BenchmarkJob)
+### 4. Cost Benchmarks (CostBenchmarkJob)
 
-Use `jobs/BenchmarkJob.py` for generic performance tests across datasets/providers. Refer to docstring for parameters.
+Use `jobs/CostBenchmarkJob.py` for generic performance tests across datasets/providers. Refer to docstring for parameters.
 
 ---
 
@@ -289,7 +287,7 @@ sudo chown -R $USER:$USER /data/venv
 
 Some Python packages require system libraries:
 ```bash
-sudo apt-get install -y libgl1 libglib2.0-0
+sudo apt-get update && sudo apt-get install -y libgl1 libglib2.0-0
 ```
 
 ### 5. Troubleshooting
