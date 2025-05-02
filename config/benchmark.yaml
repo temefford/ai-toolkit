@@ -20,7 +20,7 @@ config:
         linear_alpha: 16
       save:
         dtype: float16 # precision to save
-        save_every: 2000 # save every this many steps
+        save_every: 1000 # save every this many steps
         max_step_saves_to_keep: 4 # how many intermittent saves to keep
         push_to_hub: true #change this to True to push your trained model to Hugging Face.
         # You can either set up a HF_TOKEN env variable or you'll be prompted to log-in         
@@ -40,7 +40,7 @@ config:
           resolution: [ 1024 ]  # flux enjoys multiple resolutions
       train:
         batch_size: 4
-        steps: 2000  # total number of steps to train 500 - 4000 is a good range
+        steps: 1000  # total number of steps to train 500 - 4000 is a good range
         gradient_accumulation_steps: 1
         train_unet: true
         train_text_encoder: false  # probably won't work with flux
