@@ -4,12 +4,12 @@ config:
   # this name will be the folder and filename name
   name: "benchmark"
   training_folder: "output"
-  hardware: "runpod-H100-SXM"
-  cost_per_second: 0.000833
+  hardware: "rackspace-H100-NVL"
+  cost_per_second: 0.000347
   process:
     - type: 'sd_trainer'
       # uncomment to see performance stats in the terminal every N steps
-      performance_log_every: 250
+      performance_log_every: 20
       device: cuda:0
       # if a trigger word is specified, it will be added to captions of training data if it does not already exist
       # alternatively, in your captions you can add [trigger] and it will be replaced with the trigger word
@@ -20,11 +20,11 @@ config:
         linear_alpha: 16
       save:
         dtype: float16 # precision to save
-        save_every: 250 # save every this many steps
+        save_every: 20 # save every this many steps
         max_step_saves_to_keep: 4 # how many intermittent saves to keep
         push_to_hub: true #change this to True to push your trained model to Hugging Face.
         # You can either set up a HF_TOKEN env variable or you'll be prompted to log-in         
-        hf_repo_id: TheoMefff/flux_schnell_baroque_runpod
+        hf_repo_id: TheoMefff/flux_schnell_baroque_rackspace
         hf_private: true #whether the repo is private or public        
       datasets:
         # datasets are a folder of images. captions need to be txt files with the same name as the image
@@ -40,7 +40,7 @@ config:
           resolution: [ 1024 ]  # flux enjoys multiple resolutions
       train:
         batch_size: 4
-        steps: 250  # total number of steps to train 500 - 4000 is a good range
+        steps: 20  # total number of steps to train 500 - 4000 is a good range
         gradient_accumulation_steps: 1
         train_unet: true
         train_text_encoder: false  # probably won't work with flux
