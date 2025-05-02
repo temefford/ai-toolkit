@@ -4,6 +4,8 @@ config:
   # this name will be the folder and filename name
   name: "benchmark"
   training_folder: "output"
+  hardware: "runpod"
+  cost_per_second: 0.0008333
   process:
     - type: 'sd_trainer'
       # uncomment to see performance stats in the terminal every N steps

@@ -17,8 +17,8 @@ class BenchmarkJob(BaseJob):
         self.is_v2 = self.get_conf('is_v2', False)
         self.log_dir = self.get_conf('log_dir', None)
         self.device = self.get_conf('device', 'cpu')
-        # GPU cost per second (e.g. runpod rate)
-        self.gpu_cost_per_second = self.get_conf('gpu_cost_per_second', 0.0083)
+        # GPU cost per second (from config, default fallback)
+        self.gpu_cost_per_second = self.config.get('cost_per_second', 0.0008333)
         self.process_dict = get_all_extensions_process_dict()
         self.load_processes(self.process_dict)
 
@@ -59,6 +59,10 @@ class BenchmarkJob(BaseJob):
             print(f'  FID: {fid_score:.4f}')
             # save metrics and generate analysis
             metrics_dict = {'duration_s': duration, 'cost_$': cost, 'MSE': mse, 'CLIP': clip, 'IS_mean': is_mean, 'IS_std': is_std, 'FID': fid_score}
+            # Add hardware info from config if present
+            hardware = self.config.get('hardware', None)
+            if hardware:
+                metrics_dict['hardware'] = hardware
             # include hyperparameters from config
             hyperparams = {}
             for section in ['train', 'sample', 'model']:
