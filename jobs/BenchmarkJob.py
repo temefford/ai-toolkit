@@ -74,7 +74,21 @@ class BenchmarkJob(BaseJob):
                 if alt_gen.exists():
                     gen_path = alt_gen
                 else:
-                    raise ValueError(f"evaluation config generated_folder '{gen_folder}' does not exist")
+                    # fallback: find latest run samples folder under training_folder/job_name
+                    run_root = Path(self.training_folder) / self.name
+                    if run_root.exists():
+                        runs = [d for d in run_root.iterdir() if d.is_dir()]
+                        if runs:
+                            latest_run = max(runs, key=lambda p: p.stat().st_mtime)
+                            sample_dir = latest_run / "samples"
+                            if sample_dir.exists():
+                                gen_path = sample_dir
+                            else:
+                                raise ValueError(f"No 'samples' directory in latest run folder {latest_run}")
+                        else:
+                            raise ValueError(f"No run directories found under {run_root}")
+                    else:
+                        raise ValueError(f"evaluation config generated_folder '{gen_folder}' does not exist")
             # only include image files for evaluation
             valid_suffixes = {'.jpg', '.jpeg', '.png'}
             # collect image files recursively
