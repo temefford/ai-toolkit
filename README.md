@@ -256,6 +256,20 @@ You can now launch new instances from this custom image, ensuring all required d
 
 ---
 
+258: 
+#### Accessing Gated/Private Hugging Face Models
+If your workflow requires a gated or private model from Hugging Face (such as `black-forest-labs/FLUX.1-schnell`), you must:
+1. **Request access** to the model on its Hugging Face page.
+2. **Log in on the Rackspace VM** using your Hugging Face account:
+   ```sh
+   huggingface-cli login
+   ```
+   Paste your Hugging Face token when prompted. You can get your token from your [Hugging Face account settings](https://huggingface.co/settings/tokens).
+
+If you do not authenticate, you will see errors about access being restricted or not found for the model repository. Once logged in, rerun your job as normal.
+
+---
+
 The AI Toolkit can be deployed on Rackspace Private Cloud VMs or bare-metal servers. Below are best practices for installation and troubleshooting in this environment.
 
 ### 1. System Preparation
