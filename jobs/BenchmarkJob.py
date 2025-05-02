@@ -143,6 +143,26 @@ class BenchmarkJob(BaseJob):
                 f.write(md_content)
             print(f"Saved markdown report to {md_path}")
 
+            # Print the full markdown report as output
+            print("\n===== BENCHMARK RESULTS MARKDOWN =====\n")
+            print(md_content)
+            print("\n===== END BENCHMARK RESULTS MARKDOWN =====\n")
+
+
+            # --- Append benchmark results to README.md ---
+            readme_path = Path(self.training_folder) / "README.md"
+            try:
+                if readme_path.exists():
+                    with open(readme_path, "a") as rf:
+                        rf.write("\n\n" + md_content)
+                else:
+                    with open(readme_path, "w") as rf:
+                        rf.write(md_content)
+                print(f"Appended benchmark results to {readme_path}")
+            except Exception as e:
+                print(f"Error updating README.md: {e}")
+
+
             # --- Push to Hugging Face Hub ---
             hf_token = os.getenv("HF_TOKEN")
             hf_repo_id = os.getenv("HF_REPO_ID") or self.config.get('save', {}).get('hf_repo_id')
@@ -150,7 +170,7 @@ class BenchmarkJob(BaseJob):
                 try:
                     login(token=hf_token)
                     api = HfApi()
-                    upload_files = [(md_path, md_path.name), (csv_path, csv_path.name), (plot_path, plot_path.name)]
+                    upload_files = [(md_path, md_path.name), (csv_path, csv_path.name), (plot_path, plot_path.name), (readme_path, "README.md")]
                     if last_safetensor:
                         upload_files.append((last_safetensor, last_safetensor.name))
                     for local_path, repo_path in upload_files:
