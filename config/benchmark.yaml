@@ -4,8 +4,10 @@ config:
   # this name will be the folder and filename name
   name: "benchmark"
   training_folder: "output"
-  hardware: "runpod"
-  cost_per_second: 0.0008333
+  hardware: "rackspace"
+  cost_per_second: 0.000347
+  # If true, training will stop early if loss does not improve for 3 consecutive evaluations.
+  early_stop_on_plateau: false
   process:
     - type: 'sd_trainer'
       # uncomment to see performance stats in the terminal every N steps
@@ -24,7 +26,7 @@ config:
         max_step_saves_to_keep: 4 # how many intermittent saves to keep
         push_to_hub: true #change this to True to push your trained model to Hugging Face.
         # You can either set up a HF_TOKEN env variable or you'll be prompted to log-in         
-        hf_repo_id: TheoMefff/flux_schnell_baroque_runpod    
+        hf_repo_id: TheoMefff/flux_schnell_baroque_rackspace    
         hf_private: true #whether the repo is private or public        
       datasets:
         # datasets are a folder of images. captions need to be txt files with the same name as the image
@@ -39,7 +41,7 @@ config:
           cache_latents_to_disk: true  # leave this true unless you know what you're doing
           resolution: [ 1024 ]  # flux enjoys multiple resolutions
       train:
-        batch_size: 2
+        batch_size: 1
         steps: 1000  # total number of steps to train 500 - 4000 is a good range
         gradient_accumulation_steps: 1
         train_unet: true

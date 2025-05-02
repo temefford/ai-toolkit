@@ -15,6 +15,7 @@ from huggingface_hub import HfApi, login
 class BenchmarkJob(BaseJob):
     def __init__(self, config: OrderedDict):
         super().__init__(config)
+        self.early_stop_on_plateau = self.get_conf('early_stop_on_plateau', False)
         self.training_folder = self.get_conf('training_folder', required=True)
         self.is_v2 = self.get_conf('is_v2', False)
         self.log_dir = self.get_conf('log_dir', None)
@@ -31,11 +32,24 @@ class BenchmarkJob(BaseJob):
         print(f"Running  {len(self.process)} process{'' if len(self.process) == 1 else 'es'}")
         # start timer for fine-tuning run
         start_time = time.time()
+        last_losses = []
         for process in self.process:
-            process.run()
+            process.run(early_stop_on_plateau=self.early_stop_on_plateau)
+            # Try to get loss from process if available
+            loss = getattr(process, 'last_loss', None)
+            if loss is not None:
+                last_losses.append(loss)
+                if len(last_losses) > 3:
+                    last_losses.pop(0)
+                if self.early_stop_on_plateau and len(last_losses) == 3:
+                    if max(last_losses) - min(last_losses) < 0.001:
+                        print('Early stopping: Loss plateaued for 3 consecutive runs.')
+                        early_stop_triggered = True
+                        break
         # end timer and compute cost
         end_time = time.time()
         duration = end_time - start_time
+        self.finetune_duration = duration
         cost = duration * self.gpu_cost_per_second
         print(f"Fine-tuning run time: {duration:.2f}s, cost: ${cost:.4f}")
         # run evaluation metrics if configured
@@ -60,7 +74,7 @@ class BenchmarkJob(BaseJob):
             print(f'  Inception Score: {is_mean:.4f} +/- {is_std:.4f}')
             print(f'  FID: {fid_score:.4f}')
             # save metrics and generate analysis
-            metrics_dict = {'duration_s': duration, 'cost_$': cost, 'MSE': mse, 'CLIP': clip, 'IS_mean': is_mean, 'IS_std': is_std, 'FID': fid_score}
+            metrics_dict = {'duration_s': duration, 'finetune_duration_s': getattr(self, 'finetune_duration', duration), 'cost_$': cost, 'MSE': mse, 'CLIP': clip, 'IS_mean': is_mean, 'IS_std': is_std, 'FID': fid_score}
             # Add hardware info from config if present
             hardware = self.config.get('hardware', None)
             if hardware:
@@ -111,11 +125,11 @@ class BenchmarkJob(BaseJob):
             ax.set_ylabel("Value")
             plt.xticks(rotation=45, ha='right')
             fig.tight_layout()
-            plot_path = Path(self.training_folder) / f"{self.name}_benchmark_metrics.png"
+            plot_path = results_dir / f"{self.name}_benchmark_metrics.png"
             fig.savefig(plot_path)
             print(f"Saved metrics plot to {plot_path}")
             plt.close(fig)
-            md_content += f"\n## Plot\n\n![]({plot_path})\n"
+            md_content += f"\n## Plot\n\n![]({plot_path.name})\n"
             md_content += f"\n## CSV\n\nResults CSV: `{csv_path}`\n"
             # Find last safetensor
             safetensors = list(Path(self.training_folder).rglob("*.safetensors"))
@@ -136,7 +150,7 @@ class BenchmarkJob(BaseJob):
                 try:
                     login(token=hf_token)
                     api = HfApi()
-                    upload_files = [(md_path, md_path.name), (csv_path, csv_path.name)]
+                    upload_files = [(md_path, md_path.name), (csv_path, csv_path.name), (plot_path, plot_path.name)]
                     if last_safetensor:
                         upload_files.append((last_safetensor, last_safetensor.name))
                     for local_path, repo_path in upload_files:
@@ -154,17 +168,6 @@ class BenchmarkJob(BaseJob):
                     print(f"Error uploading to HuggingFace: {e}")
             else:
                 print("HF_TOKEN or HF_REPO_ID not set, skipping HuggingFace upload.")
-            # plot metrics
-            fig, ax = plt.subplots(figsize=(8, 4))
-            df.T.plot(kind='bar', legend=False, ax=ax)
-            ax.set_title("Benchmark Metrics")
-            ax.set_ylabel("Value")
-            plt.xticks(rotation=45, ha='right')
-            fig.tight_layout()
-            plot_path = Path(self.training_folder) / f"{self.name}_benchmark_metrics.png"
-            fig.savefig(plot_path)
-            print(f"Saved metrics plot to {plot_path}")
-            plt.close(fig)
         # Print last .safetensors file saved
         safetensors = list(Path(self.training_folder).rglob("*.safetensors"))
         if safetensors:

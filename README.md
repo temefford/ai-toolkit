@@ -129,6 +129,12 @@ Generates:
 ### 3. Benchmarking (BenchmarkJob)
 
 Configure `config/benchmark.yaml`:
+
+#### Early Stopping on Loss Plateau
+- You can enable early stopping for fine-tuning by adding `early_stop_on_plateau: true` to your config.
+- If enabled, training will stop early if the loss does not change by more than 0.001 for 3 consecutive evaluations.
+- By default, this is set to `false`.
+- The total fine-tuning duration is reported in the markdown and CSV results.
 ```yaml
 benchmark:
   base_config_file: config/schnell_config.yaml

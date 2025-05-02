@@ -17,7 +17,7 @@ process_dict = {
     'rescale_sd': 'TrainSDRescaleProcess',
     'esrgan': 'TrainESRGANProcess',
     'reference': 'TrainReferenceProcess',
-    'sd_trainer': BaseSDTrainProcess,
+    'sd_trainer': 'BaseSDTrainProcess',
 }
 
 

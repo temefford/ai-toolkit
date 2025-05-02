@@ -1422,7 +1422,7 @@ class BaseSDTrainProcess(BaseTrainProcess):
         # set trainable params
         self.sd.adapter = self.adapter
 
-    def run(self):
+    def run(self, early_stop_on_plateau=False):
         # torch.autograd.set_detect_anomaly(True)
         # run base process run
         BaseTrainProcess.run(self)
@@ -1947,10 +1947,16 @@ class BaseSDTrainProcess(BaseTrainProcess):
         start_step_num = self.step_num
         did_first_flush = False
         flush_next = False
+        last_losses = []
         for step in range(start_step_num, self.train_config.steps):
             if self.train_config.do_paramiter_swapping:
                 self.optimizer.optimizer.swap_paramiters()
             self.timer.start('train_loop')
+            # Early stop on plateau logic
+            if early_stop_on_plateau and len(last_losses) == 3:
+                if max(last_losses) - min(last_losses) < 0.001:
+                    print_acc('Early stopping: Loss plateaued for 3 consecutive steps.')
+                    break
             if flush_next:
                 flush()
                 flush_next = False
@@ -2050,6 +2056,21 @@ class BaseSDTrainProcess(BaseTrainProcess):
                     raise e
                     
             self.timer.stop('train_loop')
+            # Track loss for early stopping
+            main_loss = None
+            if isinstance(loss_dict, dict):
+                # Try to get 'loss' key, else first value
+                if 'loss' in loss_dict:
+                    main_loss = loss_dict['loss']
+                elif len(loss_dict) > 0:
+                    main_loss = list(loss_dict.values())[0]
+            else:
+                main_loss = loss_dict
+            if main_loss is not None:
+                last_losses.append(float(main_loss))
+                if len(last_losses) > 3:
+                    last_losses.pop(0)
+                self.last_loss = float(main_loss)
             if not did_first_flush:
                 flush()
                 did_first_flush = True
