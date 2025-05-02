@@ -60,10 +60,26 @@ class BenchmarkJob(BaseJob):
             prompts = eval_conf.get('prompts', [])
             if not gt_folder or not gen_folder:
                 raise ValueError('evaluation config requires ground_truth_folder and generated_folder')
+            # resolve evaluation directories relative to training_folder
+            gt_path = Path(gt_folder)
+            if not gt_path.exists():
+                alt_gt = Path(self.training_folder) / gt_folder
+                if alt_gt.exists():
+                    gt_path = alt_gt
+                else:
+                    raise ValueError(f"evaluation config ground_truth_folder '{gt_folder}' does not exist")
+            gen_path = Path(gen_folder)
+            if not gen_path.exists():
+                alt_gen = Path(self.training_folder) / gen_folder
+                if alt_gen.exists():
+                    gen_path = alt_gen
+                else:
+                    raise ValueError(f"evaluation config generated_folder '{gen_folder}' does not exist")
             # only include image files for evaluation
             valid_suffixes = {'.jpg', '.jpeg', '.png'}
-            gt_paths = sorted([p for p in Path(gt_folder).iterdir() if p.suffix.lower() in valid_suffixes])
-            gen_paths = sorted([p for p in Path(gen_folder).iterdir() if p.suffix.lower() in valid_suffixes])
+            # collect image files recursively
+            gt_paths = sorted([p for p in gt_path.rglob('*') if p.is_file() and p.suffix.lower() in valid_suffixes])
+            gen_paths = sorted([p for p in gen_path.rglob('*') if p.is_file() and p.suffix.lower() in valid_suffixes])
             gt_images = [Image.open(str(p)) for p in gt_paths]
             gen_images = [Image.open(str(p)) for p in gen_paths]
             mse = compute_validation_mse(gt_images, gen_images)
