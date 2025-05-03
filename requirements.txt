@@ -43,3 +43,4 @@ reportlab
 pillow
 packaging
 torchmetrics
+torch-fidelity
