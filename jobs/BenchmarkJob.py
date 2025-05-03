@@ -236,7 +236,8 @@ class BenchmarkJob(BaseJob):
                 try:
                     login(token=hf_token)
                     api = HfApi()
-                    upload_files = [(md_path, md_path.name), (csv_path, csv_path.name), (plot_path, plot_path.name), (readme_path, "README.md")]
+                    # Only upload results Markdown as results.md, CSV, and plot; skip sample images
+                    upload_files = [(md_path, "results.md"), (csv_path, csv_path.name), (plot_path, plot_path.name)]
                     if last_safetensor:
                         upload_files.append((last_safetensor, last_safetensor.name))
                     for local_path, repo_path in upload_files:

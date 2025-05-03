@@ -39,8 +39,8 @@ config:
           cache_latents_to_disk: true  # leave this true unless you know what you're doing
           resolution: [ 1024 ]  # flux enjoys multiple resolutions
       train:
-        batch_size: 4
-        steps: 20  # total number of steps to match number of GT images
+        batch_size: 1
+        steps: 2000  # total number of steps
         gradient_accumulation_steps: 1
         train_unet: true
         train_text_encoder: false  # probably won't work with flux
