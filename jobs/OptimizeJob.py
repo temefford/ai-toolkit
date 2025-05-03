@@ -58,6 +58,9 @@ class OptimizeJob(BaseJob):
             proc['train']['batch_size'] = batch_size
             proc['datasets'][0]['caption_dropout_rate'] = dropout
 
+            # ensure training_folder is at top-level for BenchmarkJob
+            trial_cfg['training_folder'] = proc.get('training_folder')
+
             full_conf = {'job': 'benchmark', 'config': trial_cfg}
 
             # run training and measure cost
