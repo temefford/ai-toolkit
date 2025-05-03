@@ -54,13 +54,25 @@ def compute_inception_score(images: list[Image.Image], device: torch.device=None
 
 # 4. Fréchet Inception Distance between real and generated images
 def compute_fid(gt_images: list[Image.Image], gen_images: list[Image.Image], device: torch.device=None) -> float:
-    # Convert and resize
-    gt_tensors = [pil_to_tensor(img, device=device) for img in gt_images]
-    gen_tensors = [pil_to_tensor(img, device=device) for img in gen_images]
+    # Convert and resize images to uint8 tensor [N,C,H,W]
+    gt_tensors = []
+    for img in gt_images:
+        img_resized = img.convert('RGB').resize((299, 299), Image.BILINEAR)
+        arr = np.array(img_resized).transpose(2, 0, 1)
+        tensor = torch.from_numpy(arr)
+        if device:
+            tensor = tensor.to(device)
+        gt_tensors.append(tensor)
+    gen_tensors = []
+    for img in gen_images:
+        img_resized = img.convert('RGB').resize((299, 299), Image.BILINEAR)
+        arr = np.array(img_resized).transpose(2, 0, 1)
+        tensor = torch.from_numpy(arr)
+        if device:
+            tensor = tensor.to(device)
+        gen_tensors.append(tensor)
     gt_batch = torch.stack(gt_tensors)
     gen_batch = torch.stack(gen_tensors)
-    gt_batch = torch.nn.functional.interpolate(gt_batch, size=(299, 299), mode='bilinear', align_corners=False)
-    gen_batch = torch.nn.functional.interpolate(gen_batch, size=(299, 299), mode='bilinear', align_corners=False)
     fid_metric = FrechetInceptionDistance(feature=2048).to(device) if device else FrechetInceptionDistance(feature=2048)
     fid_metric.update(gt_batch, real=True)
     fid_metric.update(gen_batch, real=False)
