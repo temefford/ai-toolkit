@@ -3,6 +3,7 @@ import random
 import time
 import copy
 from collections import OrderedDict
+from datetime import datetime
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -78,7 +79,14 @@ class OptimizeJob(BaseJob):
             proc = job.process[-1]
             val_loss = getattr(proc, 'val_loss', None)
             clip_score = getattr(proc, 'clip_score', None)
-
+            # compute normalized metrics for this trial
+            norm_loss = val_loss * duration if val_loss is not None else float('nan')
+            norm_clip = clip_score / duration if clip_score is not None else float('nan')
+            # print trial results
+            val_loss_str = f"{val_loss:.4f}" if val_loss is not None else "n/a"
+            clip_score_str = f"{clip_score:.4f}" if clip_score is not None else "n/a"
+            print(f"Trial {i}: rank={rank}, lr={lr}, batch_size={batch_size}, dropout={dropout}")
+            print(f"  val_loss={val_loss_str}, clip_score={clip_score_str}, norm_loss={norm_loss:.4f}, norm_clip={norm_clip:.4f}, cost={duration:.2f}s")
             results.append({
                 'trial': i,
                 'rank': rank,
@@ -88,17 +96,15 @@ class OptimizeJob(BaseJob):
                 'cost_sec': duration,
                 'val_loss': val_loss,
                 'clip_score': clip_score,
+                'norm_loss': norm_loss,
+                'norm_clip': norm_clip,
             })
-
-        # normalize metrics by cost
-        for r in results:
-            if r['val_loss'] is not None:
-                r['norm_loss'] = r['val_loss'] * r['cost_sec']
-            if r['clip_score'] is not None:
-                r['norm_clip'] = r['clip_score'] / r['cost_sec']
 
         # create DataFrame and plot results
         df = pd.DataFrame(results)
+        # ensure norm_clip exists even if no clip_score was recorded
+        if 'norm_clip' not in df.columns:
+            df['norm_clip'] = float('nan')
         plt.figure(figsize=(8, 6))
         sc = plt.scatter(df['lr'], df['norm_clip'], c=df['rank'], cmap='viridis', s=100)
         plt.colorbar(sc, label='LoRA rank')
@@ -109,7 +115,8 @@ class OptimizeJob(BaseJob):
         # Ensure outputs directory exists
         outputs_dir = os.path.join(os.getcwd(), 'outputs')
         os.makedirs(outputs_dir, exist_ok=True)
-        timestamp = "20250430-101446"
+        # timestamp for filenames
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
         plot_path = os.path.join(outputs_dir, f"{self.name}_hyperopt_results_{timestamp}.png")
         plt.savefig(plot_path)
         print(f"Saved hyperparameter search plot to {plot_path}")
