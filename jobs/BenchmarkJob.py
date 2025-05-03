@@ -186,7 +186,7 @@ class BenchmarkJob(BaseJob):
             print(stats.to_string())
             # plot metrics
             fig, ax = plt.subplots(figsize=(8, 4))
-            df.T.plot(kind='bar', legend=False, ax=ax)
+            df.select_dtypes(include=['number']).T.plot(kind='bar', legend=False, ax=ax)
             ax.set_title("Benchmark Metrics")
             ax.set_ylabel("Value")
             plt.xticks(rotation=45, ha='right')
