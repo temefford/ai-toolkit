@@ -6,6 +6,7 @@ from collections import OrderedDict
 
 import matplotlib.pyplot as plt
 import pandas as pd
+from huggingface_hub import HfApi, login
 
 from jobs import BaseJob
 from toolkit.job import get_job
@@ -57,7 +58,7 @@ class OptimizeJob(BaseJob):
             proc['train']['batch_size'] = batch_size
             proc['datasets'][0]['caption_dropout_rate'] = dropout
 
-            full_conf = {'job': 'extension', 'config': trial_cfg}
+            full_conf = {'job': 'benchmark', 'config': trial_cfg}
 
             # run training and measure cost
             start_ts = time.time()
@@ -157,3 +158,39 @@ class OptimizeJob(BaseJob):
             print(f"Saved PDF report to {pdf_path}")
         except Exception as e:
             print(f"Could not generate PDF: {e}\nInstall markdown2, reportlab, and pillow for PDF export.")
+
+        # Save detailed results to CSV
+        csv_path = os.path.join(outputs_dir, f"{self.name}_optimize_results_{timestamp}.csv")
+        df.to_csv(csv_path, index=False)
+        print(f"Saved detailed results CSV to {csv_path}")
+
+        # Save aggregated markdown report
+        agg_md_path = os.path.join(outputs_dir, "optimize_results.md")
+        agg_md_content = f"# Hyperparameter Optimization Results ({timestamp})\n\n"
+        agg_md_content += "## Trials Results\n\n"
+        agg_md_content += df.to_markdown(index=False)
+        with open(agg_md_path, 'w') as f:
+            f.write(agg_md_content)
+        print(f"Saved aggregated markdown report to {agg_md_path}")
+
+        # --- Upload optimize results CSV to Hugging Face ---
+        hf_token = os.getenv("HF_TOKEN")
+        hf_repo_id = os.getenv("HF_REPO_ID") or self.config.get('save', {}).get('hf_repo_id')
+        if hf_token and hf_repo_id:
+            try:
+                login(token=hf_token)
+                api = HfApi()
+                print(f"Uploading CSV {csv_path} to {hf_repo_id}...")
+                api.upload_file(
+                    path_or_fileobj=str(csv_path),
+                    path_in_repo=os.path.basename(csv_path),
+                    repo_id=hf_repo_id,
+                    repo_type="model",
+                    token=hf_token,
+                    commit_message=f"Add optimize results CSV ({timestamp})"
+                )
+                print("CSV upload complete!")
+            except Exception as e:
+                print(f"Error uploading CSV to Hugging Face: {e}")
+        else:
+            print("HF_TOKEN or HF_REPO_ID not set, skipping CSV upload.")
