@@ -326,6 +326,63 @@ accelerate launch run.py config/benchmark.yaml
 
 ---
 
+## Benchmark Evaluation
+
+The AI Toolkit provides a built-in benchmark evaluation job that:
+- Samples a random subset of images and captions defined under `evaluation` in `config/benchmark.yaml`.
+- Generates images on-the-fly using your model.
+- Computes standard metrics (MSE, CLIP score, Inception Score, FID).
+
+Configuration example in `config/benchmark.yaml`:
+```yaml
+evaluation:
+  ground_truth_folder: "Baroque"
+  generated_folder: "output/benchmark"
+  subset_size: 10
+  prompts:
+    - 'The Raising of Lazarus by Rembrandt, Baroque (1630)'
+    - 'Bust of an Old Woman, Rembrandt`s Mother'
+    - 'Self-portrait with plumed cap and lowered sabre by Rembrandt, Baroque'
+    - 'Rembrandt`s Mother in a Widow`s Dress by Rembrandt, Baroque (1632)'
+    - 'Beggar with his left hand extended by Rembrandt'
+```
+
+Steps to run evaluation:
+
+1. Activate the Python virtual environment:
+   ```bash
+   source /data/venv/bin/activate
+   ```
+2. (Optional) Authenticate to Hugging Face for gated/private models:
+   ```bash
+   huggingface-cli login
+   ```
+3. Execute the benchmark evaluation:
+   ```bash
+   accelerate launch run.py config/benchmark.yaml
+   ```
+   - Generated images → `output/benchmark`
+   - Metrics logged → console & `output/benchmark/metrics.log`
+
+### Uploading Generated Results
+
+After evaluation, upload your results:
+
+**CLI method**:
+```bash
+huggingface-cli upload-large-folder \
+  --repo-id YOUR_USERNAME/YOUR_REPO_NAME \
+  --path output/benchmark
+```
+
+**Python script** (helper `upload_benchmark.py`):
+```bash
+export HF_TOKEN=hf_<your_token>
+python upload_benchmark.py
+```
+
+---
+
 ## License
 
 Apache-2.0  Black Forest Labs

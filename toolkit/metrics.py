@@ -43,7 +43,7 @@ def compute_inception_score(images: list[Image.Image], device: torch.device=None
     batch = torch.stack(tensors)
     # Resize to 299x299 required by Inception
     batch = torch.nn.functional.interpolate(batch, size=(299, 299), mode='bilinear', align_corners=False)
-    is_metric = InceptionScore(feature=2048, num_splits=splits).to(device) if device else InceptionScore(feature=2048, num_splits=splits)
+    is_metric = InceptionScore(feature=2048).to(device) if device else InceptionScore(feature=2048)
     is_metric.update(batch)
     return is_metric.compute()
 
