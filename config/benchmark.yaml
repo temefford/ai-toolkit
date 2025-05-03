@@ -25,7 +25,7 @@ config:
         push_to_hub: true #change this to True to push your trained model to Hugging Face.
         # You can either set up a HF_TOKEN env variable or you'll be prompted to log-in         
         hf_repo_id: TheoMefff/flux_schnell_baroque_rackspace_pvc
-        hf_private: true #whether the repo is private or public        
+        hf_private: false #whether the repo is private or public        
       datasets:
         # datasets are a folder of images. captions need to be txt files with the same name as the image
         # for instance image2.jpg and image2.txt. Only jpg, jpeg, and png are supported currently
