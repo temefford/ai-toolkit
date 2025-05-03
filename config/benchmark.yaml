@@ -9,7 +9,7 @@ config:
   process:
     - type: 'sd_trainer'
       # uncomment to see performance stats in the terminal every N steps
-      performance_log_every: 10
+      performance_log_every: 1000
       device: cuda:0
       # if a trigger word is specified, it will be added to captions of training data if it does not already exist
       # alternatively, in your captions you can add [trigger] and it will be replaced with the trigger word
@@ -20,7 +20,7 @@ config:
         linear_alpha: 16
       save:
         dtype: float16 # precision to save
-        save_every: 10 # save every this many steps
+        save_every: 100 # save every this many steps
         max_step_saves_to_keep: 4 # how many intermittent saves to keep
         push_to_hub: true #change this to True to push your trained model to Hugging Face.
         # You can either set up a HF_TOKEN env variable or you'll be prompted to log-in         
@@ -40,7 +40,7 @@ config:
           resolution: [ 1024 ]  # flux enjoys multiple resolutions
       train:
         batch_size: 4
-        steps: 506  # total number of steps to match number of GT images
+        steps: 20  # total number of steps to match number of GT images
         gradient_accumulation_steps: 1
         train_unet: true
         train_text_encoder: false  # probably won't work with flux
@@ -73,7 +73,7 @@ config:
 #        low_vram: true  # uncomment this if the GPU is connected to your monitors. It will use less vram to quantize, but is slower.
       sample:
         sampler: "flowmatch" # must match train.noise_scheduler
-        sample_every: 1 # sample every step to match GT images
+        sample_every: 250 # sample every step to match GT images
         width: 1024
         height: 1024
         prompts:
@@ -97,6 +97,7 @@ config:
   evaluation:
     ground_truth_folder: "Baroque"
     generated_folder: "output/benchmark"
+    subset_size: 20  # number of images to randomly sample for evaluation
     prompts:
           - "The Raising of Lazarus by Rembrandt, Baroque (1630)"
           - "Bust of an Old Woman, Rembrandt`s Mother"

@@ -111,13 +111,27 @@ class BenchmarkJob(BaseJob):
             gt_paths = sorted([p for p in gt_path.rglob('*') if p.is_file() and p.suffix.lower() in valid_suffixes])
             gen_paths = sorted([p for p in gen_path.rglob('*') if p.is_file() and p.suffix.lower() in valid_suffixes])
             import random
-            subset_size = min(10, len(gt_paths), len(gen_paths))
+            # determine how many samples to evaluate
+            n = min(len(gt_paths), len(gen_paths))
+            subset_size_config = eval_conf.get('subset_size', 10)
+            subset_count = min(subset_size_config, n)
             random.seed(42)
-            selected_indices = random.sample(range(min(len(gt_paths), len(gen_paths))), subset_size)
-            gt_images = [Image.open(str(gt_paths[i])) for i in selected_indices]
+            selected_indices = random.sample(range(n), subset_count)
+            # load ground truth images and their captions
+            gt_images = []
+            gt_prompts = []
+            for i in selected_indices:
+                img_p = gt_paths[i]
+                gt_images.append(Image.open(str(img_p)))
+                txt_p = img_p.with_suffix('.txt')
+                if not txt_p.exists():
+                    raise ValueError(f"Missing ground truth caption file: {txt_p}")
+                gt_prompts.append(txt_p.read_text().strip())
+            # load generated images for the same indices
             gen_images = [Image.open(str(gen_paths[i])) for i in selected_indices]
+            # compute metrics on the sampled subset
             mse = compute_validation_mse(gt_images, gen_images)
-            clip = compute_clip_score(prompts, gen_images, device=self.device)
+            clip = compute_clip_score(gt_prompts, gen_images, device=self.device)
             is_mean, is_std = compute_inception_score(gen_images, device=self.device)
             fid_score = compute_fid(gt_images, gen_images, device=self.device)
             print('Evaluation metrics:')
