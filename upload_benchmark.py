@@ -19,7 +19,6 @@ def main():
     api.upload_large_folder(
         repo_id=repo_id,
         folder_path=folder_path,
-        path_in_repo="",
         repo_type="model"
     )
     print("Upload complete!")
