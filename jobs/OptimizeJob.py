@@ -79,14 +79,38 @@ class OptimizeJob(BaseJob):
             proc = job.process[-1]
             val_loss = getattr(proc, 'val_loss', None)
             clip_score = getattr(proc, 'clip_score', None)
-            # compute normalized metrics for this trial
+            # Try to fetch detailed metrics from BenchmarkJob CSV if available
+            import pandas as _pd
+            import glob as _glob
+            from pathlib import Path as _Path
+            metrics_csv = None
+            try:
+                train_folder = _Path(proc.training_folder or trial_cfg.get('training_folder', '.'))
+                matches = list(train_folder.rglob('*benchmark_results.csv'))
+                if matches:
+                    metrics_csv = matches[-1]
+                    bench_df = _pd.read_csv(metrics_csv)
+                    mse = bench_df.loc[0, 'MSE'] if 'MSE' in bench_df.columns else float('nan')
+                    clip_score = bench_df.loc[0, 'CLIP'] if 'CLIP' in bench_df.columns else clip_score
+                    is_mean = bench_df.loc[0, 'IS_mean'] if 'IS_mean' in bench_df.columns else float('nan')
+                    fid = bench_df.loc[0, 'FID'] if 'FID' in bench_df.columns else float('nan')
+                else:
+                    mse = float('nan'); is_mean = float('nan'); fid = float('nan')
+            except Exception as _e:
+                print(f"Warning: could not parse benchmark CSV: {_e}")
+                mse = float('nan'); is_mean = float('nan'); fid = float('nan')
+
+            # normalized metrics
             norm_loss = val_loss * duration if val_loss is not None else float('nan')
-            norm_clip = clip_score / duration if clip_score is not None else float('nan')
+            norm_clip = clip_score / duration if (clip_score is not None and clip_score!=float('nan')) else float('nan')
+            # composite score (higher is better): we combine clip and IS, penalize FID and MSE
+            composite = (clip_score if clip_score==clip_score else 0) + (is_mean if is_mean==is_mean else 0) - (fid if fid==fid else 0) - (mse if mse==mse else 0)
+
             # print trial results
             val_loss_str = f"{val_loss:.4f}" if val_loss is not None else "n/a"
             clip_score_str = f"{clip_score:.4f}" if clip_score is not None else "n/a"
             print(f"Trial {i}: rank={rank}, lr={lr}, batch_size={batch_size}, dropout={dropout}")
-            print(f"  val_loss={val_loss_str}, clip_score={clip_score_str}, norm_loss={norm_loss:.4f}, norm_clip={norm_clip:.4f}, cost={duration:.2f}s")
+            print(f"  val_loss={val_loss_str}, clip_score={clip_score_str}, is_mean={is_mean:.4f} fid={fid:.4f} mse={mse:.4f} composite={composite:.4f} norm_loss={norm_loss:.4f}, norm_clip={norm_clip:.4f}, cost={duration:.2f}s")
             results.append({
                 'trial': i,
                 'rank': rank,
@@ -96,9 +120,17 @@ class OptimizeJob(BaseJob):
                 'cost_sec': duration,
                 'val_loss': val_loss,
                 'clip_score': clip_score,
+                'mse': mse,
+                'is_mean': is_mean,
+                'fid': fid,
+                'composite': composite,
                 'norm_loss': norm_loss,
                 'norm_clip': norm_clip,
             })
+
+        # determine best trial by composite metric (higher better)
+        best_idx = max(range(len(results)), key=lambda i: (results[i]['composite'] if results[i]['composite']==results[i]['composite'] else -float('inf')))
+        best_trial = results[best_idx]
 
         # create DataFrame and plot results
         df = pd.DataFrame(results)
@@ -110,7 +142,13 @@ class OptimizeJob(BaseJob):
         plt.colorbar(sc, label='LoRA rank')
         plt.xlabel('Learning Rate')
         plt.ylabel('Normalized CLIP Score')
-        plt.title('Hyperparameter Search Results')
+        plt.title('Hyperparameter Search Results (norm_clip vs lr)')
+
+        # Print best trial summary
+        print("\n===== BEST HYPERPARAMETERS =====")
+        for k,v in best_trial.items():
+            print(f"{k}: {v}")
+        print("===== END BEST HYPERPARAMETERS =====\n")
 
         # Ensure outputs directory exists
         outputs_dir = os.path.join(os.getcwd(), 'outputs')
@@ -133,6 +171,12 @@ class OptimizeJob(BaseJob):
 # Hyperparameter Optimization Results ({timestamp})
 
 ![Results Plot](./{os.path.basename(plot_path)})
+
+## Best Hyperparameters (Composite Score)
+
+```
+{best_trial}
+```
 
 ## Results Table
 
@@ -185,24 +229,56 @@ class OptimizeJob(BaseJob):
             f.write(agg_md_content)
         print(f"Saved aggregated markdown report to {agg_md_path}")
 
-        # --- Upload optimize results CSV to Hugging Face ---
-        hf_token = os.getenv("HF_TOKEN")
+        # --- Upload optimize results to Hugging Face Hub ---
         hf_repo_id = os.getenv("HF_REPO_ID") or self.config.get('save', {}).get('hf_repo_id')
-        if hf_token and hf_repo_id:
-            try:
+        if hf_repo_id:
+            hf_token = os.getenv("HF_TOKEN")
+            if hf_token:
                 login(token=hf_token)
-                api = HfApi()
-                print(f"Uploading CSV {csv_path} to {hf_repo_id}...")
+            else:
+                print("HF_TOKEN not set, launching interactive login...")
+                login()
+            api = HfApi()
+            # Upload CSV
+            print(f"Uploading CSV {csv_path} to {hf_repo_id}...")
+            api.upload_file(
+                path_or_fileobj=str(csv_path),
+                path_in_repo=os.path.basename(csv_path),
+                repo_id=hf_repo_id,
+                repo_type="model",
+                token=hf_token,
+                commit_message=f"Add optimize results CSV ({timestamp})"
+            )
+            print("CSV upload complete!")
+            # Upload markdown and plot
+            try:
                 api.upload_file(
-                    path_or_fileobj=str(csv_path),
-                    path_in_repo=os.path.basename(csv_path),
+                    path_or_fileobj=str(md_path),
+                    path_in_repo=os.path.basename(md_path),
                     repo_id=hf_repo_id,
                     repo_type="model",
                     token=hf_token,
-                    commit_message=f"Add optimize results CSV ({timestamp})"
+                    commit_message=f"Add optimize results markdown ({timestamp})"
                 )
-                print("CSV upload complete!")
+                api.upload_file(
+                    path_or_fileobj=str(plot_path),
+                    path_in_repo=os.path.basename(plot_path),
+                    repo_id=hf_repo_id,
+                    repo_type="model",
+                    token=hf_token,
+                    commit_message=f"Add optimize results plot ({timestamp})"
+                )
+                print("Uploaded markdown and plot to Hugging Face.")
             except Exception as e:
-                print(f"Error uploading CSV to Hugging Face: {e}")
+                print(f"Error uploading markdown/plot to Hugging Face: {e}")
         else:
-            print("HF_TOKEN or HF_REPO_ID not set, skipping CSV upload.")
+            print("HF_REPO_ID not set, skipping Hugging Face upload.")
+
+        # attempt git commit
+        try:
+            import subprocess, shlex
+            subprocess.run(shlex.split(f"git add {md_path} {plot_path} {csv_path}"), check=False)
+            subprocess.run(shlex.split("git commit -m 'Add optimize results'"), check=False)
+            subprocess.run(shlex.split("git push"), check=False)
+        except Exception as e:
+            print(f"Git push failed: {e}")

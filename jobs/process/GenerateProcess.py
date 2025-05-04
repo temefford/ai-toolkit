@@ -136,8 +136,12 @@ class GenerateProcess(BaseProcess):
                         output_folder=self.output_folder,
                         add_prompt_file=self.generate_config.prompt_file
                     ))
-            # generate images
-            self.sd.generate_images(prompt_image_configs, sampler=self.generate_config.sampler)
+            # generate images using merged pipeline (ensures LoRA adapters fused into model)
+            self.sd.generate_images(
+                prompt_image_configs,
+                sampler=self.generate_config.sampler,
+                pipeline=self.sd.pipeline
+            )
 
             print("Done generating images")
             # cleanup

@@ -338,7 +338,11 @@ class BaseSDTrainProcess(BaseTrainProcess):
             self.adapter.is_sampling = True
         
         # send to be generated
-        self.sd.generate_images(gen_img_config_list, sampler=sample_config.sampler)
+        self.sd.generate_images(
+            gen_img_config_list,
+            sampler=sample_config.sampler,
+            pipeline=self.sd.pipeline
+        )
 
         
         if self.adapter is not None and isinstance(self.adapter, CustomAdapter):
