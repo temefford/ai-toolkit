@@ -4,8 +4,8 @@ config:
   # this name will be the folder and filename name
   name: "benchmark"
   training_folder: "output"
-  hardware: "rackspace-H100-NVL"
-  cost_per_second: 0.000347
+  hardware: "runpod-H100-SXM"
+  cost_per_second: 0.0008333
   process:
     - type: 'sd_trainer'
       # uncomment to see performance stats in the terminal every N steps
@@ -24,7 +24,7 @@ config:
         max_step_saves_to_keep: 4 # how many intermittent saves to keep
         push_to_hub: true #change this to True to push your trained model to Hugging Face.
         # You can either set up a HF_TOKEN env variable or you'll be prompted to log-in         
-        hf_repo_id: TheoMefff/flux_schnell_baroque_rackspace_pvc_1
+        hf_repo_id: TheoMefff/flux_schnell_baroque_runpod_2
         hf_private: false #whether the repo is private or public        
       datasets:
         # datasets are a folder of images. captions need to be txt files with the same name as the image
