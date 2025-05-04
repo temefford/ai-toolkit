@@ -52,6 +52,22 @@ class BenchmarkJob(BaseJob):
         self.finetune_duration = duration
         cost = duration * self.gpu_cost_per_second
         print(f"Fine-tuning run time: {duration:.2f}s, cost: ${cost:.4f}")
+        # --- Ensure model is loaded with latest fine-tuned weights and generate images if needed ---
+        # (Assume process[-1] is the main fine-tuning process)
+        main_proc = self.process[-1] if self.process else None
+        if main_proc and hasattr(main_proc, 'sd') and hasattr(main_proc, 'save_root'):
+            # Attempt to reload the latest fine-tuned weights for inference
+            latest_safetensors = list(Path(main_proc.save_root).rglob("*.safetensors"))
+            if latest_safetensors:
+                latest_ckpt = max(latest_safetensors, key=lambda p: p.stat().st_mtime)
+                print(f"Reloading fine-tuned model weights from {latest_ckpt}")
+                # Update the model path and reload weights for evaluation
+                if hasattr(main_proc.sd, 'model_config'):
+                    main_proc.sd.model_config.name_or_path = str(latest_ckpt)
+                    main_proc.sd.load_model()
+            else:
+                print("Warning: No fine-tuned weights found for evaluation.")
+
         # run evaluation metrics if configured
         eval_conf = self.get_conf('evaluation', None)
         if eval_conf:
@@ -230,32 +246,32 @@ class BenchmarkJob(BaseJob):
 
 
             # --- Push to Hugging Face Hub ---
-            hf_token = os.getenv("HF_TOKEN")
             hf_repo_id = os.getenv("HF_REPO_ID") or self.config.get('save', {}).get('hf_repo_id')
-            if hf_token and hf_repo_id:
-                try:
+            if hf_repo_id:
+                hf_token = os.getenv("HF_TOKEN")
+                if hf_token:
                     login(token=hf_token)
-                    api = HfApi()
-                    # Only upload results Markdown as results.md, CSV, and plot; skip sample images
-                    upload_files = [(md_path, "results.md"), (csv_path, csv_path.name), (plot_path, plot_path.name)]
-                    if last_safetensor:
-                        upload_files.append((last_safetensor, last_safetensor.name))
-                    for local_path, repo_path in upload_files:
-                        print(f"Uploading {local_path} to HuggingFace repo {hf_repo_id}...")
-                        api.upload_file(
-                            path_or_fileobj=str(local_path),
-                            path_in_repo=repo_path,
-                            repo_id=hf_repo_id,
-                            repo_type="model",
-                            token=hf_token,
-                            commit_message=f"Add benchmark result: {repo_path} ({timestamp})"
-                        )
-                    print("Upload to HuggingFace complete!")
-                except Exception as e:
-                    print(f"Error uploading to HuggingFace: {e}")
+                else:
+                    print("HF_TOKEN not set, launching interactive login...")
+                    login()
+                api = HfApi()
+                upload_files = [(md_path, "results.md"), (csv_path, csv_path.name), (plot_path, plot_path.name)]
+                if last_safetensor:
+                    upload_files.append((last_safetensor, last_safetensor.name))
+                for local_path, repo_path in upload_files:
+                    print(f"Uploading {local_path} to HuggingFace repo {hf_repo_id}...")
+                    api.upload_file(
+                        path_or_fileobj=str(local_path),
+                        path_in_repo=repo_path,
+                        repo_id=hf_repo_id,
+                        repo_type="model",
+                        token=hf_token,
+                        commit_message=f"Add benchmark result: {repo_path} ({timestamp})"
+                    )
+                print("Upload to HuggingFace complete!")
             else:
-                print("HF_TOKEN or HF_REPO_ID not set, skipping HuggingFace upload.")
-        # Print last .safetensors file saved
+                print("HF_REPO_ID not set, skipping HuggingFace upload.")
+        # Print last .safetensors file saved for user visibility
         safetensors = list(Path(self.training_folder).rglob("*.safetensors"))
         if safetensors:
             last_safetensor = max(safetensors, key=lambda p: p.stat().st_mtime)
