@@ -44,3 +44,4 @@ pillow
 packaging
 torchmetrics
 torch-fidelity
+tabulate

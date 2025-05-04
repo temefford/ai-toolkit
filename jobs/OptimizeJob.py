@@ -121,8 +121,12 @@ class OptimizeJob(BaseJob):
         plt.savefig(plot_path)
         print(f"Saved hyperparameter search plot to {plot_path}")
 
-        # Save results table as markdown
-        table_md = df.to_markdown(index=False)
+        # Save results table as markdown (fallback if tabulate missing)
+        try:
+            table_md = df.to_markdown(index=False)
+        except ImportError:
+            print("Warning: optional dependency 'tabulate' not installed. Using plain text table.")
+            table_md = df.to_string(index=False)
 
         # Compose markdown report
         md_report = f"""
@@ -176,9 +180,7 @@ class OptimizeJob(BaseJob):
 
         # Save aggregated markdown report
         agg_md_path = os.path.join(outputs_dir, "optimize_results.md")
-        agg_md_content = f"# Hyperparameter Optimization Results ({timestamp})\n\n"
-        agg_md_content += "## Trials Results\n\n"
-        agg_md_content += df.to_markdown(index=False)
+        agg_md_content = f"# Hyperparameter Optimization Results ({timestamp})\n\n" + "## Trials Results\n\n" + table_md
         with open(agg_md_path, 'w') as f:
             f.write(agg_md_content)
         print(f"Saved aggregated markdown report to {agg_md_path}")
